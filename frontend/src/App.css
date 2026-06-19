@@ -1,0 +1,31 @@
+/* LogiTrack Pro - Main App Styles */
+
+.App {
+  min-height: 100vh;
+}
+
+/* Layout */
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.content-area {
+  flex: 1;
+  margin-left: 256px;
+  min-height: 100vh;
+  background-color: #F8FAFC;
+}
+
+@media (max-width: 1024px) {
+  .content-area {
+    margin-left: 0;
+  }
+}
+
+/* Responsive sidebar */
+@media (max-width: 1024px) {
+  .sidebar-desktop {
+    display: none;
+  }
+}

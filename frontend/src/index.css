@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@600;700;800&family=Public+Sans:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-heading: 'Manrope', sans-serif;
+  --font-body: 'Public Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F8FAFC;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+code, .mono {
+  font-family: var(--font-mono);
+}
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 84% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 84% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 84% 5%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 47% 11%;
+    --radius: 0.5rem;
+    --chart-1: 222 47% 11%;
+    --chart-2: 24 95% 53%;
+    --chart-3: 217 91% 60%;
+    --chart-4: 160 84% 39%;
+    --chart-5: 215 14% 34%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Sidebar styles */
+.sidebar {
+  background-color: #0F172A;
+  color: white;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition-all duration-200 rounded-lg mx-2;
+}
+
+.sidebar-link.active {
+  @apply bg-slate-800 text-white border-l-4 border-orange-500;
+}
+
+/* Card enhancements */
+.card-header-accent {
+  @apply border-t-4 border-orange-500;
+}
+
+/* Table styles */
+.data-table th {
+  @apply bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider;
+}
+
+.data-table tr {
+  @apply hover:bg-gray-50 transition-colors border-b border-gray-100;
+}
+
+/* Badge variants */
+.badge-success {
+  @apply bg-green-100 text-green-800 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.badge-warning {
+  @apply bg-yellow-100 text-yellow-800 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.badge-error {
+  @apply bg-red-100 text-red-800 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.badge-neutral {
+  @apply bg-gray-100 text-gray-800 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.badge-info {
+  @apply bg-blue-100 text-blue-800 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+/* File upload dropzone */
+.dropzone {
+  @apply border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-blue-50/30 hover:bg-blue-50/50 transition-colors cursor-pointer;
+}
+
+.dropzone:hover {
+  @apply border-blue-400;
+}
+
+/* Animation classes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Glassmorphism header */
+.glass-header {
+  @apply bg-white/80 backdrop-blur-md border-b border-gray-200;
+}
+
+/* KPI Card with accent */
+.kpi-card {
+  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6 transition-all duration-200 hover:shadow-md;
+}
+
+.kpi-card.accent {
+  @apply border-t-4 border-orange-500;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@layer base {
+  [data-debug-wrapper="true"] {
+    display: contents !important;
+  }
+}
