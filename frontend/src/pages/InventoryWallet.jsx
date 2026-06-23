@@ -5,9 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { depotInventoryApi, depotsApi, productsApi, liftingsApi, pickupApi } from '../lib/api';
+import { depotInventoryApi, depotsApi, productsApi, liftingsApi, pickupApi, companyInventoryApi, companiesApi } from '../lib/api';
 import { toast } from 'sonner';
-import { Warehouse, Package, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Download, ChevronDown, ChevronUp, Filter, Truck, Train, Calendar, X, TrendingUp } from 'lucide-react';
+import { Warehouse, Package, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Download, ChevronDown, ChevronUp, Filter, Truck, Train, Calendar, X, TrendingUp, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../lib/permissions';
 
@@ -16,10 +16,13 @@ export default function InventoryWallet() {
   const { hasPermission } = usePermissions();
   const canView = hasPermission('Inventory Wallet (View)');
   const [inventory, setInventory] = useState([]);
+  const [companyInventory, setCompanyInventory] = useState([]);
   const [liftings, setLiftings] = useState([]);
   const [depots, setDepots] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedDepot, setSelectedDepot] = useState('all');
+  const [selectedCompany, setSelectedCompany] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -34,16 +37,20 @@ export default function InventoryWallet() {
 
   const fetchData = async () => {
     try {
-      const [inventoryRes, depotsRes, productsRes, liftingsRes, pickupsRes] = await Promise.all([
+      const [inventoryRes, companyInvRes, depotsRes, companiesRes, productsRes, liftingsRes, pickupsRes] = await Promise.all([
         depotInventoryApi.getAll(),
+        companyInventoryApi.getAll(),
         depotsApi.getAll(),
+        companiesApi.getAll(),
         productsApi.getAll(),
         liftingsApi.getAll({ page_size: 500 }),
         pickupApi.getAll({ status: 'verified,weightment_done,final_verified', page_size: 500 })
       ]);
       console.log('inventoryRes ===', inventoryRes, depotsRes, productsRes, liftingsRes, pickupsRes)
       setInventory(inventoryRes.data);
+      setCompanyInventory(companyInvRes.data || []);
       setDepots(depotsRes.data);
+      setCompanies(companiesRes.data || []);
       setProducts(productsRes.data);
 
       const rawLiftings = liftingsRes.data || [];
@@ -82,7 +89,7 @@ export default function InventoryWallet() {
       setLoading(false);
     }
   };
-  const toggleExpand = async (itemId, depotId, productId) => {
+  const toggleExpand = async (itemId, depotId, companyId, productId) => {
     const isExpanded = expandedItems[itemId];
 
     // Always refetch if date filters change or first time expanding
@@ -92,8 +99,13 @@ export default function InventoryWallet() {
       // Fetch ledger data with date filters
       setLoadingLedger(prev => ({ ...prev, [itemId]: true }));
       try {
-        const response = await depotInventoryApi.getLedger(depotId, productId, dateFrom, dateTo);
-        setLedgerData(prev => ({ ...prev, [itemId]: response.data }));
+        if (depotId) {
+          const response = await depotInventoryApi.getLedger(depotId, productId, dateFrom, dateTo);
+          setLedgerData(prev => ({ ...prev, [itemId]: response.data }));
+        } else if (companyId) {
+          const response = await companyInventoryApi.getLedger(companyId, productId, dateFrom, dateTo);
+          setLedgerData(prev => ({ ...prev, [itemId]: response.data }));
+        }
       } catch (error) {
         toast.error('Failed to load transaction history');
       } finally {
@@ -119,6 +131,15 @@ export default function InventoryWallet() {
     filteredInventory = filteredInventory.filter(i => i.product_id === selectedProduct);
   }
 
+  // Filter company inventory
+  let filteredCompanyInventory = companyInventory;
+  if (selectedCompany !== 'all') {
+    filteredCompanyInventory = filteredCompanyInventory.filter(i => i.company_id === selectedCompany);
+  }
+  if (selectedProduct !== 'all') {
+    filteredCompanyInventory = filteredCompanyInventory.filter(i => i.product_id === selectedProduct);
+  }
+
   // Group by depot
   const groupedByDepot = filteredInventory.reduce((acc, item) => {
     const depotId = item.depot_id;
@@ -132,8 +153,25 @@ export default function InventoryWallet() {
     return acc;
   }, {});
 
-  const primaryDepotInLiftings = liftings.filter(l => l.lifting_type === 'Primary' && l.unloading_point_type === 'Depot');
+  // Group by company for company inventory
+  const groupedByCompany = filteredCompanyInventory.reduce((acc, item) => {
+    const companyId = item.company_id;
+    if (!acc[companyId]) {
+      acc[companyId] = {
+        company_name: item.company_name,
+        items: []
+      };
+    }
+    acc[companyId].items.push(item);
+    return acc;
+  }, {});
+
+  // Depot loading point liftings (traditional Secondary)
   const secondaryDepotOutLiftings = liftings.filter(l => (l.lifting_type === 'Secondary' || l.lifting_type === 'Pickup') && l.loading_point_type === 'Depot');
+  // Company loading point liftings (Secondary from company source)
+  const secondaryCompanyOutLiftings = liftings.filter(l => l.lifting_type === 'Secondary' && l.loading_point_type === 'Company');
+  // Primary liftings into depot
+  const primaryDepotInLiftings = liftings.filter(l => l.lifting_type === 'Primary' && l.unloading_point_type === 'Depot');
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -192,10 +230,11 @@ export default function InventoryWallet() {
             <div className="flex items-start justify-between mb-3">
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">Total Available Stock</p>
-                <p className="text-3xl font-bold text-emerald-600" style={{ fontFamily: 'Manrope' }}>
-                  {filteredInventory.reduce((sum, i) => sum + (i.available_quantity || 0), 0).toFixed(2)}
-                  <span className="text-sm font-normal text-gray-400 ml-1">MT</span>
-                </p>
+<p className="text-3xl font-bold text-emerald-600" style={{ fontFamily: 'Manrope' }}>
+                   {(filteredInventory.reduce((sum, i) => sum + (i.available_quantity || 0), 0) + 
+                    filteredCompanyInventory.reduce((sum, i) => sum + (i.available_quantity || 0), 0)).toFixed(2)}
+                   <span className="text-sm font-normal text-gray-400 ml-1">MT</span>
+                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Warehouse className="w-6 h-6 text-white" />
@@ -208,13 +247,15 @@ export default function InventoryWallet() {
                 <div className="bg-green-50 rounded px-2 py-1.5">
                   <span className="text-gray-500">Total Received: </span>
                   <span className="font-semibold text-green-700">
-                    {filteredInventory.reduce((sum, i) => sum + (i.total_received || 0), 0).toFixed(2)} MT
+                    {(filteredInventory.reduce((sum, i) => sum + (i.total_received || 0), 0) + 
+                     filteredCompanyInventory.reduce((sum, i) => sum + (i.total_received || 0), 0)).toFixed(2)} MT
                   </span>
                 </div>
                 <div className="bg-red-50 rounded px-2 py-1.5">
                   <span className="text-gray-500">Total Dispatched: </span>
                   <span className="font-semibold text-red-700">
-                    {filteredInventory.reduce((sum, i) => sum + (i.total_dispatched || 0), 0).toFixed(2)} MT
+                    {(filteredInventory.reduce((sum, i) => sum + (i.total_dispatched || 0), 0) + 
+                     filteredCompanyInventory.reduce((sum, i) => sum + (i.total_dispatched || 0), 0)).toFixed(2)} MT
                   </span>
                 </div>
               </div>
@@ -267,18 +308,24 @@ export default function InventoryWallet() {
 
             {/* Secondary OUT Breakdown */}
             <div className="border-t pt-3 mt-2">
-              <p className="text-[10px] font-semibold text-purple-600 mb-1">Secondary Dispatches from Depot</p>
+              <p className="text-[10px] font-semibold text-purple-600 mb-1">Secondary Dispatches</p>
               <div className="grid grid-cols-2 gap-1 text-[10px]">
                 <div className="bg-purple-50 rounded px-2 py-1">
-                  <span className="text-gray-500">→Client: </span>
+                  <span className="text-gray-500">Depot→Client: </span>
                   <span className="font-semibold text-purple-700">
                     {secondaryDepotOutLiftings.filter(l => l.unloading_point_type === 'Company').reduce((sum, l) => sum + (l.quantity_mt || 0), 0).toFixed(2)} MT
                   </span>
                 </div>
                 <div className="bg-indigo-50 rounded px-2 py-1">
-                  <span className="text-gray-500">→Depot: </span>
+                  <span className="text-gray-500">Depot→Depot: </span>
                   <span className="font-semibold text-indigo-700">
                     {secondaryDepotOutLiftings.filter(l => l.unloading_point_type === 'Depot').reduce((sum, l) => sum + (l.quantity_mt || 0), 0).toFixed(2)} MT
+                  </span>
+                </div>
+                <div className="bg-blue-50 rounded px-2 py-1">
+                  <span className="text-gray-500">Company→Client: </span>
+                  <span className="font-semibold text-blue-700">
+                    {secondaryCompanyOutLiftings.reduce((sum, l) => sum + (l.quantity_mt || 0), 0).toFixed(2)} MT
                   </span>
                 </div>
               </div>
@@ -303,6 +350,17 @@ export default function InventoryWallet() {
                 <SelectItem value="all">All Depots</SelectItem>
                 {depots.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -335,11 +393,11 @@ export default function InventoryWallet() {
                 placeholder="To Date"
               />
             </div>
-            {(selectedDepot !== 'all' || selectedProduct !== 'all' || dateFrom || dateTo) && (
+{(selectedDepot !== 'all' || selectedCompany !== 'all' || selectedProduct !== 'all' || dateFrom || dateTo) && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setSelectedDepot('all'); setSelectedProduct('all'); setDateFrom(''); setDateTo(''); }}
+                onClick={() => { setSelectedDepot('all'); setSelectedCompany('all'); setSelectedProduct('all'); setDateFrom(''); setDateTo(''); }}
                 className="text-orange-600"
               >
                 <X className="w-4 h-4 mr-1" />
@@ -350,7 +408,7 @@ export default function InventoryWallet() {
         </CardContent>
       </Card>
 
-      {Object.keys(groupedByDepot).length === 0 ? (
+      {Object.keys(groupedByDepot).length === 0 && Object.keys(groupedByCompany).length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Warehouse className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -377,7 +435,7 @@ export default function InventoryWallet() {
                       {/* Main Row */}
                       <div
                         className="p-4 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => toggleExpand(item.id, item.depot_id, item.product_id)}
+                        onClick={() => toggleExpand(item.id, item.depot_id, null, item.product_id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
@@ -643,6 +701,91 @@ export default function InventoryWallet() {
               </CardContent>
             </Card>
           ))}
+          
+          {/* Company Inventory Section */}
+          {Object.keys(groupedByCompany).length > 0 && (
+            <>
+              <h2 className="text-xl font-bold text-slate-800 mt-8 mb-4">Company Inventory (Source)</h2>
+              {Object.entries(groupedByCompany).map(([companyId, companyData]) => (
+                <Card key={companyId}>
+                   <CardHeader className="border-b bg-blue-900 text-white rounded-t-lg">
+                    <div className="flex items-center gap-3">
+                      <Building2 className="w-6 h-6" />
+                      <CardTitle className="text-lg">{companyData.company_name}</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {companyData.items.map((item) => (
+                        <div key={item.id} className="transition-colors">
+                          {/* Main Row */}
+                          <div
+                            className="p-4 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => toggleExpand(item.id, null, item.company_id, item.product_id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="p-3 bg-blue-100 rounded-lg">
+                                  <Package className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-slate-900">{item.product_name}</h4>
+                                  {item.product_code && (
+                                    <p className="text-sm text-gray-500 mono">{item.product_code}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Stock Level - Highlighted Card */}
+                              <div className="flex items-center gap-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3 text-center shadow-sm">
+                                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Available Stock</p>
+                                  <p className="text-3xl font-bold text-blue-700" style={{ fontFamily: 'Manrope' }}>
+                                    {item.available_quantity?.toFixed(2)} <span className="text-lg font-medium text-blue-500">MT</span>
+                                  </p>
+                                </div>
+                                <div className="p-2 hover:bg-gray-200 rounded-lg">
+                                  {expandedItems[item.id] ? (
+                                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                                  ) : (
+                                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Stats Row */}
+                            <div className="mt-4 grid grid-cols-3 gap-4 pt-4 border-t">
+                              <div className="flex items-center gap-2">
+                                <ArrowDownToLine className="w-4 h-4 text-green-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500">Total Received</p>
+                                  <p className="font-medium text-green-600">{item.total_received?.toFixed(2)} MT</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <ArrowUpFromLine className="w-4 h-4 text-red-500" />
+                                <div>
+                                  <p className="text-xs text-gray-500">Total Dispatched</p>
+                                  <p className="font-medium text-red-600">{item.total_dispatched?.toFixed(2)} MT</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-gray-500">Last Updated</p>
+                                <p className="text-sm text-gray-600">
+                                  {item.last_updated ? new Date(item.last_updated).toLocaleString() : '-'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          )}
         </div>
       )}
     </PageLayout>

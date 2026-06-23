@@ -15,6 +15,7 @@ from .depot_access import router as depot_access_router
 from .purchase_orders import router as purchase_orders_router
 from .pickups import router as pickups_router
 from .verified_trucks import router as verified_trucks_router
+from .company_inventory import router as company_inventory_router
 
 __all__ = [
     'reports_router',
@@ -32,6 +33,8 @@ __all__ = [
     ,
     'depot_access_router'
     ,
+    'purchase_orders_router',
     'pickups_router',
-    'verified_trucks_router'
+    'verified_trucks_router',
+    'company_inventory_router'
 ]

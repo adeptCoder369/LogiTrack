@@ -312,6 +312,11 @@ companyId: urlCompanyId || '',
       const transportMode = po.transport_mode || 'Road';
       setSelectedTransportMode(transportMode);
 
+      // Determine loading point type based on PO source type
+      const loadingPointType = po.source_type === 'Company' ? 'Company' : 'Depot';
+      const loadingPointId = po.source_type === 'Company' ? po.source_company_id : po.depot_id;
+      const loadingPointName = po.source_type === 'Company' ? po.source_company_name : po.depot_name;
+
       setFormData({
         ...formData,
         purchase_order_id: po.id,
@@ -321,9 +326,9 @@ companyId: urlCompanyId || '',
         product_name: po.product_name,
         product_code: po.product_code,
 
-        loading_point_type: 'Depot',
-        loading_point_id: po.depot_id,
-        loading_point_name: po.depot_name,
+        loading_point_type: loadingPointType,
+        loading_point_id: loadingPointId,
+        loading_point_name: loadingPointName,
 
         unloading_point_type: 'Company',
         unloading_point_id: po.to_company_id,
@@ -1270,7 +1275,7 @@ companyId: urlCompanyId || '',
                   <SelectContent>
                     <SelectItem value="all">All Companies</SelectItem>
                     {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1493,7 +1498,7 @@ companyId: urlCompanyId || '',
                             <div className="flex flex-col">
                               <span className="font-medium">{po.po_number}</span>
                               <span className="text-xs text-gray-500">
-                                {po.product_name} • {po.depot_name}
+                                {po.product_name} • {po.source_type === 'Company' ? po.source_company_name : po.depot_name}
                               </span>
                             </div>
                           </SelectItem>

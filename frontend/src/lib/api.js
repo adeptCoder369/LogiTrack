@@ -174,6 +174,16 @@ export const depotInventoryApi = {
     }),
 };
 
+// Company Inventory
+export const companyInventoryApi = {
+  getAll: () => api.get('/company-inventory'),
+  getByCompany: (companyId) => api.get(`/company-inventory/${companyId}`),
+  getLedger: (companyId, productId, dateFrom, dateTo) => 
+    api.get(`/company-inventory/ledger/${companyId}/${productId}`, { 
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined } 
+    }),
+};
+
 // Delivery Orders
 export const deliveryOrdersApi = {
   getAll: (status) => api.get('/delivery-orders', { params: { status } }),

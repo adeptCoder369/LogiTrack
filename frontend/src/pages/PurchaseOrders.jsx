@@ -58,6 +58,8 @@ export default function PurchaseOrders() {
   const { hasPermission } = usePermissions();
 
   const [formData, setFormData] = useState({
+    source_type: 'Depot',
+    source_company_id: '',
     depot_id: '',
     depot_name: '',
     to_company_id: '',
@@ -173,6 +175,8 @@ export default function PurchaseOrders() {
     setSelectedItem(item);
 
     setFormData({
+      source_type: item.source_type || 'Depot',
+      source_company_id: item.source_company_id || '',
       depot_id: item.depot_id || '',
       depot_name: item.depot_name || '',
 
@@ -213,6 +217,15 @@ export default function PurchaseOrders() {
     });
   };
 
+  const handleSourceCompanyChange = (id) => {
+    const c = companies.find(x => x.id === id);
+    setFormData({
+      ...formData,
+      source_company_id: id,
+      source_company_name: c?.name || ''
+    });
+  };
+
   const handleProductChange = (id) => {
     const p = products.find(x => x.id === id);
     setFormData({
@@ -226,8 +239,9 @@ export default function PurchaseOrders() {
   const handleSubmit = async () => {
     if (
       !formData.product_id ||
-      !formData.depot_id ||
-      !formData.total_quantity_mt
+      !formData.to_company_id ||
+      !formData.total_quantity_mt ||
+      ((formData.source_type === 'Depot' && !formData.depot_id) || (formData.source_type === 'Company' && !formData.source_company_id))
     ) {
       toast.error('Please fill required fields');
       return;
@@ -443,7 +457,12 @@ export default function PurchaseOrders() {
       }
     },
 
-    { key: 'depot_name', label: 'Depot' },
+    { 
+      key: 'source_type', 
+      label: 'Source',
+      render: (v) => v === 'Company' ? 'Company' : 'Depot'
+    },
+    { key: 'source_company_name', label: 'Source Company' },
     { key: 'to_company_name', label: 'Client' },
     { key: 'product_name', label: 'Product' },
 
@@ -828,6 +847,58 @@ export default function PurchaseOrders() {
         loading={saving}
       >
         <div className="space-y-4">
+
+          <div>
+            <Label>Source Type *</Label>
+            <Select
+              value={formData.source_type}
+              onValueChange={(v) => setFormData({ ...formData, source_type: v, source_company_id: '', depot_id: '' })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select source type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Depot">Depot</SelectItem>
+                <SelectItem value="Company">Company</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {formData.source_type === 'Company' ? (
+            <div>
+              <Label>Source Company *</Label>
+              <Select
+                value={formData.source_company_id}
+                onValueChange={handleSourceCompanyChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.filter(c => c.company_type === 'Source' || c.company_type === 'Both').map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div>
+              <Label>Depot *</Label>
+              <Select
+                value={formData.depot_id}
+                onValueChange={handleDepotChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select depot" />
+                </SelectTrigger>
+                <SelectContent>
+                  {depots.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label>Client Company *</Label>

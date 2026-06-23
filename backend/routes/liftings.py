@@ -5,13 +5,13 @@ from datetime import datetime, timezone
 
 from database import db
 from auth_utils import get_current_user, check_permission, build_product_filter, check_product_access
-from models import Lifting, LiftingCreate, VerifyUnloadRequest, DepotInventory
+from models import Lifting, LiftingCreate, VerifyUnloadRequest, DepotInventory, CompanyInventory
 
 router = APIRouter(tags=["Liftings"])
 
 # Helper function for updating depot inventory
 async def update_depot_inventory(depot_id: str, depot_name: str, product_id: str, product_name: str, 
-                                  product_code: str, quantity_change: float, is_incoming: bool, company_id: str):
+                                   product_code: str, quantity_change: float, is_incoming: bool, company_id: str):
     existing = await db.depot_inventory.find_one({
         "depot_id": depot_id,
         "product_id": product_id
@@ -53,6 +53,51 @@ async def update_depot_inventory(depot_id: str, depot_name: str, product_id: str
             available_quantity=quantity_change if is_incoming else 0
         )
         await db.depot_inventory.insert_one(inventory.model_dump())
+
+
+# Helper function for updating company inventory
+async def update_company_inventory(company_id: str, company_name: str, product_id: str, product_name: str,
+                                   product_code: str, quantity_change: float, is_incoming: bool):
+    existing = await db.company_inventory.find_one({
+        "company_id": company_id,
+        "product_id": product_id
+    })
+    
+    if existing:
+        if is_incoming:
+            new_received = existing.get("total_received", 0) + quantity_change
+            new_available = existing.get("available_quantity", 0) + quantity_change
+            await db.company_inventory.update_one(
+                {"id": existing["id"]},
+                {"$set": {
+                    "total_received": new_received,
+                    "available_quantity": new_available,
+                    "last_updated": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        else:
+            new_dispatched = existing.get("total_dispatched", 0) + quantity_change
+            new_available = existing.get("available_quantity", 0) - quantity_change
+            await db.company_inventory.update_one(
+                {"id": existing["id"]},
+                {"$set": {
+                    "total_dispatched": new_dispatched,
+                    "available_quantity": max(0, new_available),
+                    "last_updated": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+    else:
+        inventory = CompanyInventory(
+            company_id=company_id,
+            company_name=company_name,
+            product_id=product_id,
+            product_name=product_name,
+            product_code=product_code or "",
+            total_received=quantity_change if is_incoming else 0,
+            total_dispatched=0 if is_incoming else quantity_change,
+            available_quantity=quantity_change if is_incoming else 0
+        )
+        await db.company_inventory.insert_one(inventory.model_dump())
 
 
 @router.post("/liftings", response_model=Lifting)
@@ -120,8 +165,13 @@ async def create_lifting(data: LiftingCreate, current_user: dict = Depends(get_c
         if po["product_id"] != data.product_id:
             raise HTTPException(400, "PO product mismatch")
 
-        if po["depot_id"] != data.loading_point_id:
-            raise HTTPException(400, "PO depot mismatch")
+        # Validate source matches PO - if PO is from depot, check depot match
+        if po.get("source_type") == "Depot":
+            if po.get("depot_id") != data.loading_point_id:
+                raise HTTPException(400, "PO depot mismatch")
+        
+        elif po.get("source_type") == "Company":
+            raise HTTPException(400, "PO is from company source, not depot")
 
         # Update PO
         new_dispatched = float(po.get("dispatched_quantity_mt") or 0) + float(data.quantity_mt or 0)
@@ -131,6 +181,69 @@ async def create_lifting(data: LiftingCreate, current_user: dict = Depends(get_c
         # ====================================
         # STATUS LOGIC
         # ====================================
+        if po.get("status") == "Completed":
+
+            new_status = "Completed"
+
+        elif new_dispatched <= 0:
+
+            new_status = "Open"
+
+        else:
+
+            new_status = "In Progress"
+
+        await db.purchase_orders.update_one(
+            {"id": po["id"]},
+            {
+                "$inc": {
+                    "dispatched_quantity_mt": data.quantity_mt,
+                    "remaining_quantity_mt": -data.quantity_mt
+                },
+                "$set": {
+                    "status": new_status
+                }
+            }
+        )
+    
+    if data.lifting_type == "Secondary" and data.loading_point_type == "Company":
+        inventory = await db.company_inventory.find_one({
+                "company_id": data.loading_point_id,
+                "product_id": data.product_id
+            })
+
+        available = inventory.get("available_quantity", 0) if inventory else 0
+
+        if data.quantity_mt > available:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock at company ({available} MT available)"
+            )
+
+        po = await db.purchase_orders.find_one({"id": data.purchase_order_id})
+
+        if not po:
+            raise HTTPException(404, "Purchase Order not found")
+
+        if po["remaining_quantity_mt"] < data.quantity_mt:
+            raise HTTPException(400, "PO quantity exceeded")
+
+        # Validate PO product & source company
+        if po["product_id"] != data.product_id:
+            raise HTTPException(400, "PO product mismatch")
+
+        # Validate source matches PO source (either depot or company)
+        if po.get("source_type") == "Company":
+            if po.get("source_company_id") != data.loading_point_id:
+                raise HTTPException(400, "PO source company mismatch")
+        elif po.get("source_type") == "Depot":
+            raise HTTPException(400, "PO is from depot source, cannot load from company")
+        
+        # Update PO
+        new_dispatched = float(po.get("dispatched_quantity_mt") or 0) + float(data.quantity_mt or 0)
+        
+        new_remaining = float(po.get("remaining_quantity_mt") or 0) - float(data.quantity_mt or 0)
+
         if po.get("status") == "Completed":
 
             new_status = "Completed"
@@ -216,6 +329,19 @@ async def create_lifting(data: LiftingCreate, current_user: dict = Depends(get_c
                 quantity_change=data.quantity_mt,
                 is_incoming=False,
                 company_id=company_id
+            )
+    
+    if data.lifting_type == "Secondary" and data.loading_point_type == "Company" and data.loading_point_id:
+        company = await db.companies.find_one({"id": data.loading_point_id})
+        if company:
+            await update_company_inventory(
+                company_id=data.loading_point_id,
+                company_name=data.loading_point_name or company.get("name", ""),
+                product_id=data.product_id or "",
+                product_name=data.product_name or "",
+                product_code=data.product_code or "",
+                quantity_change=data.quantity_mt,
+                is_incoming=False
             )
     
     return lifting
@@ -379,30 +505,24 @@ async def verify_lifting_unload(
                 is_incoming=True,
                 company_id=lifting.get("company_id")
             )
-
-#        await db.depot_inventory.update_one(
-#            {
-#                "depot_id": lifting.loading_point_id,
-#                "product_id": lifting.product_id
-#            },
-#            {
-#                "$inc": {
-#                    "total_dispatched": lifting.net_weight_mt,
-#                    "available_quantity": -lifting.net_weight_mt
-#                }
-#            }
-#        )
     
-    # Mark company as "Client" if lifting is to a company
+# Update company inventory if unloading to company (Primary: company receives stock)
     if lifting.get("unloading_point_type") == "Company" and lifting.get("unloading_point_id"):
-        await db.companies.update_one(
-            {"id": lifting["unloading_point_id"]},
-            {"$set": {"is_client": True}}
-        )
-    
+        company = await db.companies.find_one({"id": lifting["unloading_point_id"]})
+        if company:
+            await update_company_inventory(
+                company_id=lifting["unloading_point_id"],
+                company_name=lifting.get("unloading_point_name") or company.get("name", ""),
+                product_id=lifting.get("product_id") or "",
+                product_name=lifting.get("product_name") or "",
+                product_code=lifting.get("product_code") or "",
+                quantity_change=lifting.get("quantity_mt", 0),
+                is_incoming=True
+            )
+
     return {"message": "Lifting verified successfully"}
-    
-    
+
+
 @router.put("/liftings/{lifting_id}/reject")
 async def reject_lifting_unload(
     lifting_id: str,
@@ -516,6 +636,20 @@ async def reject_lifting_unload(
                     is_incoming=True,  # stock returned to depot
                     company_id=lifting.get("company_id")
                 )
+        
+        # Reverse company inventory for Secondary liftings from company (stock returned to company)
+        if lifting.get("lifting_type") == "Secondary" and lifting.get("loading_point_type") == "Company" and lifting.get("loading_point_id"):
+            company = await db.companies.find_one({"id": lifting["loading_point_id"]})
+            if company:
+                await update_company_inventory(
+                    company_id=lifting["loading_point_id"],
+                    company_name=lifting.get("loading_point_name") or company.get("name", ""),
+                    product_id=lifting.get("product_id") or "",
+                    product_name=lifting.get("product_name") or "",
+                    product_code=lifting.get("product_code") or "",
+                    quantity_change=lifting.get("quantity_mt", 0),
+                    is_incoming=True  # stock returned to company
+                )
 
         # Reverse depot inventory for Primary liftings to Depot (rejected before verification)
         if lifting.get("lifting_type") == "Primary" and lifting.get("unloading_point_type") == "Depot" and lifting.get("unloading_point_id"):
@@ -530,6 +664,20 @@ async def reject_lifting_unload(
                     quantity_change=lifting.get("quantity_mt", 0),
                     is_incoming=False,  # remove stock from depot
                     company_id=lifting.get("company_id")
+                )
+        
+        # Reverse company inventory for Primary liftings to Company (rejected before verification)
+        if lifting.get("lifting_type") == "Primary" and lifting.get("unloading_point_type") == "Company" and lifting.get("unloading_point_id"):
+            company = await db.companies.find_one({"id": lifting["unloading_point_id"]})
+            if company:
+                await update_company_inventory(
+                    company_id=lifting["unloading_point_id"],
+                    company_name=lifting.get("unloading_point_name") or company.get("name", ""),
+                    product_id=lifting.get("product_id") or "",
+                    product_name=lifting.get("product_name") or "",
+                    product_code=lifting.get("product_code") or "",
+                    quantity_change=lifting.get("quantity_mt", 0),
+                    is_incoming=False  # remove stock from company
                 )
 
         await db.liftings.update_one(

@@ -2630,8 +2630,9 @@ from routes import (
     product_access_router,
     depot_access_router,
     purchase_orders_router,
-    pickups_router
-    ,verified_trucks_router
+    pickups_router,
+    verified_trucks_router,
+    company_inventory_router
 )
 
 # Include all modular routers
@@ -2651,6 +2652,7 @@ api_router.include_router(depot_access_router)
 api_router.include_router(purchase_orders_router)
 api_router.include_router(pickups_router)
 api_router.include_router(verified_trucks_router)
+api_router.include_router(company_inventory_router)
 
 # Include router and middleware
 app.include_router(api_router)

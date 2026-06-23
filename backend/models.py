@@ -118,7 +118,8 @@ class CompanyBase(BaseModel):
     ifsc_code: Optional[str] = None
     contact_person_name: Optional[str] = None
     contact_person_mobile: Optional[str] = None
-    is_client: bool = False  # Auto-set to True when a verified lifting is done for this company
+    is_client: bool = False
+    company_type: Optional[str] = "Client"
 
 class CompanyCreate(CompanyBase):
     pass
@@ -246,6 +247,19 @@ class DepotInventory(BaseModel):
     depot_id: str
     company_id: str
     depot_name: str
+    product_id: str
+    product_name: str
+    product_code: Optional[str] = None
+    total_received: float = 0
+    total_dispatched: float = 0
+    available_quantity: float = 0
+    last_updated: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class CompanyInventory(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    company_name: str
     product_id: str
     product_name: str
     product_code: Optional[str] = None
@@ -445,8 +459,11 @@ class VerifyUnloadRequest(BaseModel):
     time_of_unloading: str
 
 class PurchaseOrderBase(BaseModel):
-    depot_id: str
+    source_type: Optional[str] = "Depot"
+    depot_id: Optional[str] = None
     depot_name: Optional[str] = None
+    source_company_id: Optional[str] = None
+    source_company_name: Optional[str] = None
     
     to_company_id: Optional[str] = None
     to_company_name: Optional[str] = None
@@ -483,6 +500,12 @@ class PurchaseOrder(PurchaseOrderBase):
     added_by_name: Optional[str] = None
     
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def set_po_number(self, sequence_num: int):
+        if self.source_type == "Company":
+            self.po_number = f"PO-COMP-{str(sequence_num).zfill(6)}"
+        else:
+            self.po_number = f"PO-{str(sequence_num).zfill(6)}"
 
 class PickupBase(BaseModel):
     date: str

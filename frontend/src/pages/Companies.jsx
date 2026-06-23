@@ -42,6 +42,11 @@ const columns = [
             Client
           </span>
         )}
+        {row.company_type && (row.company_type === 'Source' || row.company_type === 'Both') && (
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+            {row.company_type === 'Both' ? 'Source+Client' : 'Source'}
+          </span>
+        )}
       </div>
     )
   },
@@ -53,9 +58,9 @@ const columns = [
   { key: 'telephone', label: 'Phone' },
   { 
     key: 'logo_file_id',
-     label: 'Logo',
+    label: 'Logo',
     render: (v) => v ? <img src={`${API_BASE}/uploads/${v}`} alt="Logo" className="w-6 h-6 rounded-full object-cover" /> : <span className="text-gray-400">No Logo</span>
-    },
+  },
 ];
 
 const indianStates = [
@@ -113,6 +118,7 @@ export default function Companies() {
     ifsc_code: '',
     contact_person_name: '',
     contact_person_mobile: '',
+    company_type: 'Client',
   });
 
   const [userFormData, setUserFormData] = useState({
@@ -209,6 +215,7 @@ export default function Companies() {
       ifsc_code: '',
       contact_person_name: '',
       contact_person_mobile: '',
+      company_type: 'Client',
     });
     setModalOpen(true);
   };
@@ -243,6 +250,7 @@ export default function Companies() {
       ifsc_code: item.ifsc_code || '',
       contact_person_name: item.contact_person_name || '',
       contact_person_mobile: item.contact_person_mobile || '',
+      company_type: item.company_type || 'Client',
     });
     setModalOpen(true);
   };
@@ -898,6 +906,20 @@ export default function Companies() {
                     <SelectItem value="Registered">Registered</SelectItem>
                     <SelectItem value="Unregistered">Unregistered</SelectItem>
                     <SelectItem value="Composition">Composition</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label>Company Type</Label>
+                <Select value={formData.company_type} onValueChange={(v) => setFormData({ ...formData, company_type: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Client">Client (Destination only)</SelectItem>
+                    <SelectItem value="Source">Source (Inventory source)</SelectItem>
+                    <SelectItem value="Both">Both (Source & Client)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

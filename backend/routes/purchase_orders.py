@@ -2,12 +2,58 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Body
 from typing import List, Optional
+from datetime import datetime, timezone
 
 from database import db
-from auth_utils import get_current_user, check_permission, build_product_filter, build_depot_filter, check_product_access, check_depot_access
-from models import PurchaseOrder, PurchaseOrderCreate
+from auth_utils import get_current_user, check_permission, build_product_filter, check_product_access
+from models import PurchaseOrder, PurchaseOrderCreate, CompanyInventory
 
 router = APIRouter(tags=["Purchase Orders"])
+
+
+async def update_company_inventory(company_id: str, company_name: str, product_id: str, product_name: str,
+                                  product_code: str, quantity_change: float, is_incoming: bool, from_lifting: bool = True):
+    """Update or create company inventory record"""
+    existing = await db.company_inventory.find_one({
+        "company_id": company_id,
+        "product_id": product_id
+    })
+    
+    if existing:
+        if is_incoming:
+            new_received = existing.get("total_received", 0) + quantity_change
+            new_available = existing.get("available_quantity", 0) + quantity_change
+            await db.company_inventory.update_one(
+                {"id": existing["id"]},
+                {"$set": {
+                    "total_received": new_received,
+                    "available_quantity": new_available,
+                    "last_updated": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        else:
+            new_dispatched = existing.get("total_dispatched", 0) + quantity_change
+            new_available = existing.get("available_quantity", 0) - quantity_change
+            await db.company_inventory.update_one(
+                {"id": existing["id"]},
+                {"$set": {
+                    "total_dispatched": new_dispatched,
+                    "available_quantity": max(0, new_available),
+                    "last_updated": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+    else:
+        inventory = CompanyInventory(
+            company_id=company_id,
+            company_name=company_name,
+            product_id=product_id,
+            product_name=product_name,
+            product_code=product_code or "",
+            total_received=quantity_change if is_incoming else 0,
+            total_dispatched=0 if is_incoming else quantity_change,
+            available_quantity=quantity_change if is_incoming else 0
+        )
+        await db.company_inventory.insert_one(inventory.model_dump())
 
 
 # ✅ CREATE PURCHASE ORDER
@@ -18,15 +64,47 @@ async def create_purchase_order(
 ):
     # Permission check
     await check_permission(current_user, "Purchase Orders (Create)")
-
+    
     # Product access check
     if data.product_id:
         await check_product_access(current_user, data.product_id)
-
+    
+    # Validate source: either depot OR source company must be provided
+    if data.source_type == "Depot":
+        if not data.depot_id:
+            raise HTTPException(status_code=400, detail="Depot is required when source type is Depot")
+        depot = await db.depots.find_one({"id": data.depot_id})
+        if not depot:
+            raise HTTPException(status_code=404, detail="Depot not found")
+    elif data.source_type == "Company":
+        if not data.source_company_id:
+            raise HTTPException(status_code=400, detail="Source company is required when source type is Company")
+        company = await db.companies.find_one({"id": data.source_company_id})
+        if not company:
+            raise HTTPException(status_code=404, detail="Source company not found")
+        if company.get("company_type") not in ["Source", "Both"]:
+            raise HTTPException(status_code=400, detail="Selected company is not configured as a source")
+        # Check company inventory availability
+        inventory = await db.company_inventory.find_one({
+            "company_id": data.source_company_id,
+            "product_id": data.product_id
+        })
+        available = inventory.get("available_quantity", 0) if inventory else 0
+        if available < data.total_quantity_mt:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock at company ({available} MT available)"
+            )
+    else:
+        raise HTTPException(status_code=400, detail="Invalid source_type. Must be 'Depot' or 'Company'")
+    
     # Generate PO number
     count = await db.purchase_orders.count_documents({})
-    po_number = f"PO-{str(count + 1).zfill(6)}"
-
+    if data.source_type == "Company":
+        po_number = f"PO-COMP-{str(count + 1).zfill(6)}"
+    else:
+        po_number = f"PO-{str(count + 1).zfill(6)}"
+    
     # Create PO
     order = PurchaseOrder(
         **data.model_dump(exclude_none=True),
@@ -35,7 +113,7 @@ async def create_purchase_order(
         added_by=current_user["id"],
         added_by_name=current_user["name"]
     )
-
+    
     await db.purchase_orders.insert_one(order.model_dump())
     return order
 
@@ -48,10 +126,20 @@ async def get_purchase_orders(
 ):
     await check_permission(current_user, "Purchase Orders (View)")
 
-    # Apply product and depot filters
+    # Apply product filter
     query = await build_product_filter(current_user, "product_id")
-    depot_filter = await build_depot_filter(current_user, "depot_id")
-    query.update(depot_filter)
+    
+    # For non-Management, filter by source company if set
+    if current_user.get("role") != "Management" and current_user.get("company_id"):
+        company = await db.companies.find_one({"id": current_user["company_id"]})
+        if company and company.get("company_type") in ["Source", "Both"]:
+            query["source_company_id"] = current_user["company_id"]
+        else:
+            depot_filter = await build_depot_filter(current_user, "depot_id")
+            query.update(depot_filter)
+    elif current_user.get("role") != "Management":
+        depot_filter = await build_depot_filter(current_user, "depot_id")
+        query.update(depot_filter)
     
     if status:
         query["status"] = status

@@ -1249,13 +1249,13 @@ export default function DeliveryOrders() {
                         All Destination Types
                       </SelectItem>
                       <SelectItem value="Depot">To Depot</SelectItem>
-                      {/* <SelectItem value="Company">To Company</SelectItem> */}
-                      {/* <SelectItem value="Both">Both (Depot & Company)</SelectItem> */}
+                      <SelectItem value="Company">To Company</SelectItem>
+                      <SelectItem value="Both">Both (Depot & Company)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {formData.destination_type === 'Depot' && (
+{formData.destination_type === 'Depot' && (
                   <div>
                     <Label>To Depot (Destination) *</Label>
                     <Select value={formData.to_depot_id} onValueChange={handleDepotChange}>
@@ -1271,7 +1271,7 @@ export default function DeliveryOrders() {
                   </div>
                 )}
 
-                {/* {formData.destination_type === 'Company' && (
+                {formData.destination_type === 'Company' && (
                   <div>
                     <Label>To Company (Client) *</Label>
                     <Select value={formData.to_company_id} onValueChange={handleDestinationCompanyChange}>
@@ -1285,9 +1285,9 @@ export default function DeliveryOrders() {
                       </SelectContent>
                     </Select>
                   </div>
-                )} */}
+                )}
 
-                {/* {formData.destination_type === 'Both' && (
+                {formData.destination_type === 'Both' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>To Depot *</Label>
@@ -1316,7 +1316,7 @@ export default function DeliveryOrders() {
                       </Select>
                     </div>
                   </div>
-                )} */}
+                )}
               </div>
             )}
           </div>

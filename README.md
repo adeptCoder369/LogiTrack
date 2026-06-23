@@ -1,7 +1,7 @@
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload      
 STOCK IN == creating the Primary Lifting ...
 
-
+Continue  opencode -s ses_120634401ffeTcJ6sxIhWCK0AW
 
 so 
 there is this new requirement :
@@ -88,7 +88,39 @@ Inventory Consistency	Ensure atomic updates with MongoDB transactions
 UI Complexity	Use conditional rendering to avoid overwhelming users
 Reporting	Add company inventory reports for Management
 Key Questions for Clarification
-1. Should POs created for company-source use a separate number sequence (e.g., PO-COMP-xxx)?
-2. Should the Management role see all company inventory, or only companies they manage?
-3. For the transfer flow (company → depot), should that be a separate DO type or reuse existing?
-4. Any limit on how many companies can be marked as "Source"?
+1. Should POs created for company-source use a separate number sequence (e.g., PO-COMP-xxx)? -- YES
+2. Should the Management role see all company inventory, or only companies they manage? -- NO, Management see everything
+3. For the transfer flow (company → depot), should that be a separate DO type or reuse existing? --BOTH OPTION
+4. Any limit on how many companies can be marked as "Source"? --- NO
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▼Todo
+[✓] TODO 1.1: Add company_type field to Company model in models.py
+[✓] TODO 1.2: Create CompanyInventory model in models.py
+[✓] TODO 1.3: Create company_inventory routes (new file)
+[✓] TODO 2.1: Update PurchaseOrder model for company source
+[✓] TODO 2.2: Update PO creation/update logic for company source validation
+[•] TODO 2.3: Update Lifting routes for company loading
+[ ] TODO 3.1: Add company type field in Companies form
+[ ] TODO 3.2: Display company type in Companies table and add API endpoint
+[ ] TODO 4.1: Add source selection in PO form (Depot vs Company)
+[ ] TODO 5.1: Add Company Inventory tab in InventoryWallet
+[ ] TODO 6.1: Enable To Company destination in DeliveryOrders
+[ ] TODO 7.1: Support company loading point in Liftings
+[ ] TODO 8.1: Fix company_id filter bug in Liftings.jsx:1273
+ opencode -s ses_120634401ffeTcJ6sxIhWCK0AW
+ 
