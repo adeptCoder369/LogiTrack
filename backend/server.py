@@ -101,6 +101,7 @@ def create_token(user_data: dict) -> str:
         "mobile": user_data["mobile"],
         "role": user_data["role"],
         "name": user_data["name"],
+        "tenant_id": user_data.get("tenant_id"),
         "exp": datetime.now(timezone.utc).timestamp() + 86400 * 7
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

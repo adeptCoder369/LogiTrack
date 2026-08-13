@@ -5,6 +5,7 @@ from sqlalchemy import select, func, update, delete, and_, or_, asc, desc
 from typing import Dict, List
 import models_sqlalchemy as sql_models
 from database import AsyncSessionLocal
+from tenant import tenant_filter, get_current_tenant_id, PLATFORM_TENANT_ID
 
 
 class _QueryCursor:
@@ -150,6 +151,10 @@ class _CollectionProxy:
         doc_copy = dict(doc)
         doc_copy.pop('_id', None)
         valid_cols = {c.name for c in self._model.__table__.columns}
+        # Auto-stamp tenant_id so no caller can forget it. Master admin
+        # (unset context) inserts belong to the platform tenant.
+        if 'tenant_id' in valid_cols and not doc_copy.get('tenant_id'):
+            doc_copy['tenant_id'] = get_current_tenant_id() or PLATFORM_TENANT_ID
         doc_copy = {k: v for k, v in doc_copy.items() if k in valid_cols}
         obj = self._model(**doc_copy)
         async with AsyncSessionLocal() as session:
@@ -255,6 +260,12 @@ class _CollectionProxy:
 
     def _build_conditions(self, filter_dict: Dict):
         conditions = []
+        # Tenant isolation: every query is scoped to the current request's
+        # tenant (master admin context is None -> no filter). Injected at the
+        # top level so it ANDs correctly with $or branches in caller filters.
+        tfilter = tenant_filter(self._model)
+        if tfilter is not None:
+            conditions.append(tfilter)
         for key, value in filter_dict.items():
             if key == '$and':
                 for sub in value:

@@ -12,6 +12,7 @@ from sqlalchemy import func
 from database import engine, AsyncSessionLocal, get_db
 from models_sqlalchemy import User, OTP, Product, Depot, Permission
 from config import JWT_SECRET, JWT_ALGORITHM, PERMISSION_DEFAULTS, normalize_role_name, normalize_permission_map
+from tenant import set_tenant_scope, ensure_tenant_active, tenant_filter
 
 security = HTTPBearer()
 
@@ -42,6 +43,7 @@ def create_token(user_data: dict) -> str:
         "mobile": user_data["mobile"],
         "role": user_data["role"],
         "name": user_data["name"],
+        "tenant_id": user_data.get("tenant_id"),
         "exp": datetime.now(timezone.utc).timestamp() + 86400 * 7
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -55,6 +57,7 @@ async def load_user_by_id(user_id: str) -> dict:
             raise HTTPException(status_code=401, detail="User not found")
         return {
             "id": user.id,
+            "tenant_id": user.tenant_id,
             "name": user.name,
             "mobile": user.mobile,
             "country_code": user.country_code,
@@ -85,7 +88,10 @@ def decode_token(token: str) -> dict:
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     payload = decode_token(credentials.credentials)
-    return await load_user_by_id(payload["user_id"])
+    user = await load_user_by_id(payload["user_id"])
+    set_tenant_scope(user)
+    await ensure_tenant_active(user)
+    return user
 
 
 DOWNLOAD_TOKEN_TTL_SECONDS = 1800
@@ -234,9 +240,11 @@ async def get_user_product_ids(user: dict) -> Optional[List[str]]:
     if role:
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
-            result = await session.execute(
-                select(Product.id).where(role_in_assigned_roles(Product.assigned_roles, role))
-            )
+            stmt = select(Product.id).where(role_in_assigned_roles(Product.assigned_roles, role))
+            tfilter = tenant_filter(Product)
+            if tfilter is not None:
+                stmt = stmt.where(tfilter)
+            result = await session.execute(stmt)
             role_products = {row[0] for row in result.all()}
 
     effective_products = assigned_products.union(role_products.difference(excluded_products))
@@ -254,9 +262,11 @@ async def get_user_depot_ids(user: dict) -> Optional[List[str]]:
     if role:
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
-            result = await session.execute(
-                select(Depot.id).where(role_in_assigned_roles(Depot.assigned_roles, role))
-            )
+            stmt = select(Depot.id).where(role_in_assigned_roles(Depot.assigned_roles, role))
+            tfilter = tenant_filter(Depot)
+            if tfilter is not None:
+                stmt = stmt.where(tfilter)
+            result = await session.execute(stmt)
             role_depots = {row[0] for row in result.all()}
 
     effective_depots = assigned_depots.union(role_depots.difference(excluded_depots))
