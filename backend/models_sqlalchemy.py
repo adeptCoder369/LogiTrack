@@ -3,9 +3,25 @@ from sqlalchemy.dialects.mysql import VARCHAR
 from database import Base
 
 
+class Tenant(Base):
+    __tablename__ = 'tenants'
+    id = Column(VARCHAR(36), primary_key=True)
+    name = Column(VARCHAR(255), nullable=False)
+    slug = Column(VARCHAR(100), nullable=False)
+    status = Column(VARCHAR(20), default='active')
+    subscription_plan = Column(VARCHAR(50))
+    branding = Column(JSON)
+    feature_flags = Column(JSON)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_slug', 'slug', unique=True),
+    )
+
+
 class User(Base):
     __tablename__ = 'users'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     name = Column(VARCHAR(255), nullable=False)
     mobile = Column(VARCHAR(20), nullable=False)
     country_code = Column(VARCHAR(5), default='91')
@@ -26,11 +42,12 @@ class User(Base):
     created_by = Column(VARCHAR(36))
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
-        Index('uk_mobile', 'mobile', unique=True),
+        Index('uk_mobile', 'tenant_id', 'mobile', unique=True),
         Index('idx_role', 'role'),
         Index('idx_company', 'company_id'),
         Index('idx_depot', 'depot_id'),
         Index('idx_transporter', 'transporter_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
@@ -54,6 +71,7 @@ class OTP(Base):
 class Company(Base):
     __tablename__ = 'companies'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     name = Column(VARCHAR(255), nullable=False)
     trade_name = Column(VARCHAR(255))
     logo_file_id = Column(VARCHAR(255))
@@ -89,12 +107,14 @@ class Company(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_name', 'name'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class CompanyUser(Base):
     __tablename__ = 'company_users'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     company_id = Column(VARCHAR(36), nullable=False)
     name = Column(VARCHAR(255), nullable=False)
     title = Column(VARCHAR(100))
@@ -118,12 +138,14 @@ class CompanyUser(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_company', 'company_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Transporter(Base):
     __tablename__ = 'transporters'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     name = Column(VARCHAR(255), nullable=False)
     trade_name = Column(VARCHAR(255))
     contact_person_name = Column(VARCHAR(255))
@@ -137,12 +159,14 @@ class Transporter(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_name', 'name'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Truck(Base):
     __tablename__ = 'trucks'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     vehicle_number = Column(VARCHAR(50), nullable=False)
     transporter_id = Column(VARCHAR(36))
     transporter_name = Column(VARCHAR(255))
@@ -182,14 +206,16 @@ class Truck(Base):
     helper2_photo = Column(VARCHAR(255))
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
-        Index('uk_vehicle_number', 'vehicle_number', unique=True),
+        Index('uk_vehicle_number', 'tenant_id', 'vehicle_number', unique=True),
         Index('idx_transporter', 'transporter_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Product(Base):
     __tablename__ = 'products'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     product_name = Column(VARCHAR(255), nullable=False)
     product_code = Column(VARCHAR(100))
     product_description = Column(Text)
@@ -199,13 +225,15 @@ class Product(Base):
     assigned_roles = Column(JSON)
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
-        Index('uk_product_code', 'product_code', unique=True),
+        Index('uk_product_code', 'tenant_id', 'product_code', unique=True),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Depot(Base):
     __tablename__ = 'depots'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     name = Column(VARCHAR(255), nullable=False)
     location = Column(VARCHAR(255))
     city = Column(VARCHAR(100))
@@ -219,12 +247,14 @@ class Depot(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_name', 'name'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class DepotInventory(Base):
     __tablename__ = 'depot_inventory'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     depot_id = Column(VARCHAR(36), nullable=False)
     company_id = Column(VARCHAR(36))
     depot_name = Column(VARCHAR(255), nullable=False)
@@ -236,14 +266,16 @@ class DepotInventory(Base):
     available_quantity = Column(Float, default=0)
     last_updated = Column(DateTime)
     __table_args__ = (
-        Index('uk_depot_product', 'depot_id', 'product_id', unique=True),
+        Index('uk_depot_product', 'tenant_id', 'depot_id', 'product_id', unique=True),
         Index('idx_product', 'product_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class CompanyInventory(Base):
     __tablename__ = 'company_inventory'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     company_id = Column(VARCHAR(36), nullable=False)
     company_name = Column(VARCHAR(255), nullable=False)
     product_id = Column(VARCHAR(36), nullable=False)
@@ -254,14 +286,16 @@ class CompanyInventory(Base):
     available_quantity = Column(Float, default=0)
     last_updated = Column(DateTime)
     __table_args__ = (
-        Index('uk_company_product', 'company_id', 'product_id', unique=True),
+        Index('uk_company_product', 'tenant_id', 'company_id', 'product_id', unique=True),
         Index('idx_product', 'product_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class DeliveryOrder(Base):
     __tablename__ = 'delivery_orders'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     transport_mode = Column(VARCHAR(20), default='Road')
     from_company_id = Column(VARCHAR(36))
     from_company_name = Column(VARCHAR(255))
@@ -297,12 +331,14 @@ class DeliveryOrder(Base):
         Index('idx_product', 'product_id'),
         Index('idx_to_company', 'to_company_id'),
         Index('idx_to_depot', 'to_depot_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Lifting(Base):
     __tablename__ = 'liftings'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     lifting_type = Column(VARCHAR(20), default='Primary')
     transport_mode = Column(VARCHAR(20), default='Road')
     company_id = Column(VARCHAR(36))
@@ -370,12 +406,14 @@ class Lifting(Base):
         Index('idx_purchase_order', 'purchase_order_id'),
         Index('idx_pickup', 'pickup_id'),
         Index('idx_vehicle', 'vehicle_number'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Pickup(Base):
     __tablename__ = 'pickups'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     date = Column(VARCHAR(50))
     truck_number = Column(VARCHAR(50))
     truck_id = Column(VARCHAR(36))
@@ -429,12 +467,14 @@ class Pickup(Base):
         Index('idx_status', 'status'),
         Index('idx_truck', 'truck_number'),
         Index('idx_company', 'company_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class PurchaseOrder(Base):
     __tablename__ = 'purchase_orders'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     depot_id = Column(VARCHAR(36))
     depot_name = Column(VARCHAR(255))
     source_type = Column(VARCHAR(50), default='Depot')
@@ -463,12 +503,14 @@ class PurchaseOrder(Base):
         Index('idx_status', 'status'),
         Index('idx_product', 'product_id'),
         Index('idx_company', 'to_company_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class VerifiedTruck(Base):
     __tablename__ = 'verified_trucks'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     date = Column(VARCHAR(50), nullable=False)
     truck_no = Column(VARCHAR(50), nullable=False)
     transporter = Column(VARCHAR(255))
@@ -502,6 +544,7 @@ class VerifiedTruck(Base):
         Index('idx_date', 'date'),
         Index('idx_truck_no', 'truck_no'),
         Index('idx_pickup', 'pickup_id'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
@@ -515,6 +558,7 @@ class Permission(Base):
 class RailwayZone(Base):
     __tablename__ = 'railway_zones'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     country = Column(VARCHAR(50))
     railway_zone = Column(VARCHAR(255))
     zone_code = Column(VARCHAR(50))
@@ -522,11 +566,15 @@ class RailwayZone(Base):
     area_coverage = Column(Text)
     divisions_allotted = Column(Text)
     created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+    )
 
 
 class RailwaySiding(Base):
     __tablename__ = 'railway_sidings'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     siding_name = Column(VARCHAR(255), nullable=False)
     siding_code = Column(VARCHAR(50))
     location = Column(VARCHAR(255))
@@ -538,12 +586,14 @@ class RailwaySiding(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_siding_code', 'siding_code'),
+        Index('idx_tenant', 'tenant_id'),
     )
 
 
 class Report(Base):
     __tablename__ = 'reports'
     id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
     report_type = Column(VARCHAR(100))
     data = Column(JSON)
     created_by = Column(VARCHAR(36))
