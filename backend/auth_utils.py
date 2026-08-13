@@ -146,7 +146,12 @@ async def get_download_user(
         payload = decode_token(token)
         if scope_required and payload.get("scope") != DOWNLOAD_TOKEN_SCOPE:
             raise HTTPException(status_code=401, detail="Invalid download token")
-        return await load_user_by_id(payload["user_id"])
+        user = await load_user_by_id(payload["user_id"])
+        # Exports and file reads must be tenant-scoped too; without this the
+        # download token would run with an unset tenant context (unfiltered).
+        set_tenant_scope(user)
+        await ensure_tenant_active(user)
+        return user
     except HTTPException as exc:
         if DOWNLOAD_AUTH_ENFORCED:
             raise

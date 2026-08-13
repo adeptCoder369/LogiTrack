@@ -11,6 +11,7 @@ from .db_compat import db
 from database import AsyncSessionLocal
 import models_sqlalchemy as sql_models
 from auth_utils import get_current_user, check_permission, build_product_filter, check_product_access
+from tenant import get_current_tenant_id, PLATFORM_TENANT_ID
 from models import Lifting, LiftingCreate, VerifyUnloadRequest
 
 router = APIRouter(tags=["Liftings"])
@@ -74,6 +75,7 @@ async def _apply_inventory_movement(model, key_values: dict, seed_values: dict,
 
     stmt = mysql_insert(model).values(
         id=str(uuid.uuid4()),
+        tenant_id=get_current_tenant_id() or PLATFORM_TENANT_ID,
         **key_values,
         **seed_values,
         total_received=delta_received,

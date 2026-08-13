@@ -26,6 +26,7 @@ from auth_utils import get_user_product_ids, get_user_depot_ids, build_product_f
 from database import engine, Base, get_db, init_db, AsyncSessionLocal
 from config import PERMISSION_DEFAULTS
 from routes.db_compat import db
+from tenant import tenant_filter, tenant_id_for_current_user, PLATFORM_TENANT_ID
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -147,6 +148,7 @@ class VerifyOTPRequest(BaseModel):
     country_code: str = "91"
     otp_code: str
     purpose: OtpPurpose = "login"
+    tenant: Optional[str] = None
 
 
 class LoginWithPasswordRequest(BaseModel):
@@ -158,6 +160,7 @@ class LoginWithPasswordRequest(BaseModel):
 class LoginWithOTPRequest(BaseModel):
     mobile: str
     country_code: str = "91"
+    tenant: Optional[str] = None
 
 
 class FirstTimeSetupRequest(BaseModel):
@@ -165,6 +168,7 @@ class FirstTimeSetupRequest(BaseModel):
     country_code: str = "91"
     otp_code: str
     new_password: str
+    tenant: Optional[str] = None
 
 
 class AdminCreateUserRequest(BaseModel):
@@ -188,6 +192,7 @@ class ResetPasswordRequest(BaseModel):
     country_code: str = "91"
     otp_code: str
     new_password: str
+    tenant: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -199,6 +204,58 @@ class UserLogin(BaseModel):
     mobile: str
     country_code: str = "91"
     password: str
+    tenant: Optional[str] = None
+
+
+async def _tenant_id_by_slug(tenant: Optional[str]) -> Optional[str]:
+    """Resolve an optional tenant slug to its id (None when not provided)."""
+    if not tenant:
+        return None
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(sql_models.Tenant.id).where(sql_models.Tenant.slug == tenant)
+        )
+        tenant_id = result.scalar_one_or_none()
+    if not tenant_id:
+        raise HTTPException(status_code=404, detail="Unknown tenant")
+    return tenant_id
+
+
+async def _find_user_by_mobile(
+    mobile: str,
+    country_code: str,
+    tenant_id: Optional[str] = None,
+):
+    """Resolve a user by mobile number, disambiguating across tenants.
+
+    uk_mobile is per-tenant, so the same number can exist in several tenants.
+    When it does and no tenant is given, the caller must supply one -- the
+    login page then asks for the tenant slug. Mirrors the legacy lookup, which
+    also tried the digits-only and prefixed spellings of the number.
+    """
+    full_mobile = normalize_mobile(mobile, country_code)
+    spellings = {full_mobile}
+    legacy = ''.join(filter(str.isdigit, str(mobile)))
+    if len(legacy) == 10:
+        spellings.add(legacy)
+        if f"{country_code}{legacy}" != full_mobile:
+            spellings.add(f"{country_code}{legacy}")
+    async with AsyncSessionLocal() as session:
+        stmt = select(sql_models.User).where(sql_models.User.mobile.in_(spellings))
+        if tenant_id:
+            stmt = stmt.where(sql_models.User.tenant_id == tenant_id)
+        result = await session.execute(stmt.limit(20))
+        users = result.scalars().all()
+    if not users:
+        return None
+    if len(users) == 1:
+        return users[0]
+    if tenant_id:
+        return next((u for u in users if u.tenant_id == tenant_id), None)
+    raise HTTPException(
+        status_code=401,
+        detail="This mobile belongs to more than one workspace. Please provide your tenant slug.",
+    )
 
 
 @api_router.get("/country-codes")
@@ -287,18 +344,10 @@ async def resend_otp(request: SendOTPRequest):
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
-    full_mobile = normalize_mobile(data.mobile, data.country_code)
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == full_mobile))
-        user = result.scalar_one_or_none()
+    tenant_id = await _tenant_id_by_slug(data.tenant)
+    user = await _find_user_by_mobile(data.mobile, data.country_code, tenant_id)
     if not user:
-        legacy_mobile = ''.join(filter(str.isdigit, str(data.mobile)))
-        if len(legacy_mobile) == 10:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == legacy_mobile))
-                user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid mobile number or password")
+        raise HTTPException(status_code=401, detail="Invalid mobile number or password")
     if not user.password_set:
         otp_code = generate_otp()
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=OTP_EXPIRY_SECONDS)
@@ -326,6 +375,7 @@ async def login(data: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid mobile number or password")
     user_response = {
         "id": user.id,
+        "tenant_id": user.tenant_id,
         "name": user.name,
         "mobile": user.mobile,
         "country_code": user.country_code,
@@ -343,18 +393,10 @@ async def login(data: UserLogin):
 
 @api_router.post("/auth/first-time-setup", response_model=TokenResponse)
 async def first_time_setup(data: FirstTimeSetupRequest):
-    full_mobile = normalize_mobile(data.mobile, data.country_code)
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == full_mobile))
-        user = result.scalar_one_or_none()
+    tenant_id = await _tenant_id_by_slug(data.tenant)
+    user = await _find_user_by_mobile(data.mobile, data.country_code, tenant_id)
     if not user:
-        legacy_mobile = ''.join(filter(str.isdigit, str(data.mobile)))
-        if len(legacy_mobile) == 10:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == legacy_mobile))
-                user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found")
     if user.password_set:
         raise HTTPException(status_code=400, detail="Password already set. Please use regular login.")
     async with AsyncSessionLocal() as session:
@@ -391,6 +433,7 @@ async def first_time_setup(data: FirstTimeSetupRequest):
         updated_user = result.scalar_one_or_none()
     user_response = {
         "id": updated_user.id,
+        "tenant_id": updated_user.tenant_id,
         "name": updated_user.name,
         "mobile": updated_user.mobile,
         "country_code": updated_user.country_code,
@@ -407,10 +450,8 @@ async def first_time_setup(data: FirstTimeSetupRequest):
 
 @api_router.post("/auth/login-otp")
 async def login_with_otp(data: LoginWithOTPRequest):
-    full_mobile = f"{data.country_code}{data.mobile}"
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == full_mobile))
-        user = result.scalar_one_or_none()
+    tenant_id = await _tenant_id_by_slug(data.tenant)
+    user = await _find_user_by_mobile(data.mobile, data.country_code, tenant_id)
     if not user:
         raise HTTPException(status_code=404, detail="No account found with this mobile number")
     otp_request = SendOTPRequest(mobile=data.mobile, country_code=data.country_code, purpose="login")
@@ -443,19 +484,13 @@ async def verify_login_otp(request: VerifyOTPRequest):
             update(sql_models.OTP).where(sql_models.OTP.id == otp_record.id).values(verified=True)
         )
         await session.commit()
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == full_mobile))
-        user = result.scalar_one_or_none()
-    if not user:
-        legacy_mobile = ''.join(filter(str.isdigit, str(request.mobile)))
-        if len(legacy_mobile) == 10:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == legacy_mobile))
-                user = result.scalar_one_or_none()
+    tenant_id = await _tenant_id_by_slug(request.tenant)
+    user = await _find_user_by_mobile(request.mobile, request.country_code, tenant_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user_response = {
         "id": user.id,
+        "tenant_id": user.tenant_id,
         "name": user.name,
         "mobile": user.mobile,
         "country_code": user.country_code,
@@ -478,10 +513,8 @@ async def verify_login_otp(request: VerifyOTPRequest):
 
 @api_router.post("/auth/forgot-password")
 async def forgot_password(data: LoginWithOTPRequest):
-    full_mobile = f"{data.country_code}{data.mobile}"
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == full_mobile))
-        user = result.scalar_one_or_none()
+    tenant_id = await _tenant_id_by_slug(data.tenant)
+    user = await _find_user_by_mobile(data.mobile, data.country_code, tenant_id)
     if not user:
         raise HTTPException(status_code=404, detail="No account found with this mobile number")
     otp_request = SendOTPRequest(mobile=data.mobile, country_code=data.country_code, purpose="reset_password")
@@ -509,15 +542,8 @@ async def reset_password(data: ResetPasswordRequest):
     ensure_otp_attempts_remaining(otp_record)
     if otp_record.otp_code != data.otp_code:
         await reject_invalid_otp(otp_record)
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == full_mobile))
-        user = result.scalar_one_or_none()
-    if not user:
-        legacy_mobile = ''.join(filter(str.isdigit, str(data.mobile)))
-        if len(legacy_mobile) == 10:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(sql_models.User).where(sql_models.User.mobile == legacy_mobile))
-                user = result.scalar_one_or_none()
+    tenant_id = await _tenant_id_by_slug(data.tenant)
+    user = await _find_user_by_mobile(data.mobile, data.country_code, tenant_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     async with AsyncSessionLocal() as session:
@@ -568,10 +594,13 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
     async with AsyncSessionLocal() as session:
         # The OR spans up to three spellings of the same number. Each is unique on
         # its own, but they can match different rows, so take the first match
-        # rather than assert there is exactly one.
-        result = await session.execute(
-            select(sql_models.User).where(or_(*query_conditions)).limit(1)
-        )
+        # rather than assert there is exactly one. Scoped to the caller's tenant:
+        # the same mobile may exist in another tenant.
+        stmt = select(sql_models.User).where(or_(*query_conditions)).limit(1)
+        tfilter = tenant_filter(sql_models.User)
+        if tfilter is not None:
+            stmt = stmt.where(tfilter)
+        result = await session.execute(stmt)
         existing = result.scalars().first()
     if existing:
         existing_name = existing.name or "This user"
@@ -579,6 +608,7 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
     user_id = str(uuid.uuid4())
     user_doc = sql_models.User(
         id=user_id,
+        tenant_id=tenant_id_for_current_user(current_user),
         name=data.name,
         mobile=full_mobile,
         country_code=data.country_code,
@@ -600,7 +630,11 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
         transporter_id = data.transporter_id or data.company_id
         if transporter_id:
             async with AsyncSessionLocal() as session:
-                result = await session.execute(select(sql_models.Transporter).where(sql_models.Transporter.id == transporter_id))
+                stmt = select(sql_models.Transporter).where(sql_models.Transporter.id == transporter_id)
+                tfilter = tenant_filter(sql_models.Transporter)
+                if tfilter is not None:
+                    stmt = stmt.where(tfilter)
+                result = await session.execute(stmt)
                 transporter = result.scalar_one_or_none()
             if transporter:
                 user_doc.transporter_id = transporter_id
@@ -672,9 +706,11 @@ async def get_file(file_id: str, current_user: dict = Depends(get_download_user)
 @api_router.get("/users")
 async def get_users(current_user: dict = Depends(get_current_user)):
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(sql_models.User).options(undefer(sql_models.User.password))
-        )
+        stmt = select(sql_models.User).options(undefer(sql_models.User.password))
+        tfilter = tenant_filter(sql_models.User)
+        if tfilter is not None:
+            stmt = stmt.where(tfilter)
+        result = await session.execute(stmt)
         users = result.scalars().all()
         user_list = []
         for u in users:
@@ -714,7 +750,11 @@ async def update_user(user_id: str, data: UpdateUserRequest, current_user: dict 
     if current_user.get("role") != "Management":
         raise HTTPException(status_code=403, detail="Only Management can update users")
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.id == user_id))
+        stmt = select(sql_models.User).where(sql_models.User.id == user_id)
+        tfilter = tenant_filter(sql_models.User)
+        if tfilter is not None:
+            stmt = stmt.where(tfilter)
+        result = await session.execute(stmt)
         user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -743,7 +783,11 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
     if current_user.get("role") != "Management":
         raise HTTPException(status_code=403, detail="Only Management can delete users")
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(sql_models.User).where(sql_models.User.id == user_id))
+        stmt = select(sql_models.User).where(sql_models.User.id == user_id)
+        tfilter = tenant_filter(sql_models.User)
+        if tfilter is not None:
+            stmt = stmt.where(tfilter)
+        result = await session.execute(stmt)
         user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1218,14 +1262,17 @@ async def bulk_import(entity: str, file: UploadFile = File(...), current_user: d
                         errors.append(f"Row {row_idx}: Vehicle Number is required")
                         continue
                     async with AsyncSessionLocal() as session:
-                        existing = (await session.execute(
-                            select(sql_models.Truck).where(sql_models.Truck.vehicle_number == vehicle_number)
-                        )).scalar_one_or_none()
+                        stmt = select(sql_models.Truck).where(sql_models.Truck.vehicle_number == vehicle_number)
+                        tfilter = tenant_filter(sql_models.Truck)
+                        if tfilter is not None:
+                            stmt = stmt.where(tfilter)
+                        existing = (await session.execute(stmt)).scalar_one_or_none()
                         if existing:
                             errors.append(f"Row {row_idx}: Vehicle {vehicle_number} already exists")
                             continue
                         truck = sql_models.Truck(
                             id=str(uuid.uuid4()),
+                            tenant_id=tenant_id_for_current_user(current_user),
                             vehicle_number=vehicle_number,
                             transporter_name=row_data.get("Transporter Name") or "",
                             driver_name=row_data.get("Driver Name") or "",
@@ -1248,14 +1295,17 @@ async def bulk_import(entity: str, file: UploadFile = File(...), current_user: d
                         errors.append(f"Row {row_idx}: Product Name and Code are required")
                         continue
                     async with AsyncSessionLocal() as session:
-                        existing = (await session.execute(
-                            select(sql_models.Product).where(sql_models.Product.product_code == product_code)
-                        )).scalar_one_or_none()
+                        stmt = select(sql_models.Product).where(sql_models.Product.product_code == product_code)
+                        tfilter = tenant_filter(sql_models.Product)
+                        if tfilter is not None:
+                            stmt = stmt.where(tfilter)
+                        existing = (await session.execute(stmt)).scalar_one_or_none()
                         if existing:
                             errors.append(f"Row {row_idx}: Product code {product_code} already exists")
                             continue
                         product = sql_models.Product(
                             id=str(uuid.uuid4()),
+                            tenant_id=tenant_id_for_current_user(current_user),
                             product_name=product_name,
                             product_code=product_code,
                             category=row_data.get("Category") or "",
@@ -1276,6 +1326,7 @@ async def bulk_import(entity: str, file: UploadFile = File(...), current_user: d
                     async with AsyncSessionLocal() as session:
                         company = sql_models.Company(
                             id=str(uuid.uuid4()),
+                            tenant_id=tenant_id_for_current_user(current_user),
                             name=company_name,
                             address=row_data.get("Address") or "",
                             city=row_data.get("City") or "",
@@ -1300,6 +1351,7 @@ async def bulk_import(entity: str, file: UploadFile = File(...), current_user: d
                     async with AsyncSessionLocal() as session:
                         transporter = sql_models.Transporter(
                             id=str(uuid.uuid4()),
+                            tenant_id=tenant_id_for_current_user(current_user),
                             name=transporter_name,
                             contact_person_name=row_data.get("Contact Person") or "",
                             mobile_number=row_data.get("Phone") or "",
@@ -1742,9 +1794,33 @@ async def seed_permissions():
     logger.info("Default permissions seeded")
 
 
+async def seed_platform_tenant():
+    """Create the platform tenant if the migration has not seeded it yet."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(sql_models.Tenant).where(sql_models.Tenant.id == PLATFORM_TENANT_ID)
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            return
+        session.add(sql_models.Tenant(
+            id=PLATFORM_TENANT_ID,
+            name="Platform",
+            slug="platform",
+            status="active",
+            subscription_plan="platform",
+            branding={"name": "IBRMCO"},
+            feature_flags={},
+            created_at=datetime.now(timezone.utc),
+        ))
+        await session.commit()
+    logger.info("Platform tenant seeded")
+
+
 @app.on_event("startup")
 async def seed_master_admin():
     await init_db()
+    await seed_platform_tenant()
     if not MASTER_ADMIN_MOBILE or not MASTER_ADMIN_PASSWORD:
         logger.warning("Master Admin credentials not configured")
         return
@@ -1753,6 +1829,13 @@ async def seed_master_admin():
         result = await session.execute(select(sql_models.User).where(sql_models.User.is_master_admin == True))
         existing = result.scalar_one_or_none()
     if existing:
+        if not existing.tenant_id:
+            async with AsyncSessionLocal() as session:
+                await session.execute(
+                    update(sql_models.User).where(sql_models.User.id == existing.id)
+                    .values(tenant_id=PLATFORM_TENANT_ID)
+                )
+                await session.commit()
         async with AsyncSessionLocal() as session:
             await session.execute(
                 update(sql_models.User).where(sql_models.User.is_master_admin == True).values(
@@ -1765,7 +1848,7 @@ async def seed_master_admin():
         logger.info(f"Master Admin updated: +{full_mobile}")
     else:
         master_admin = sql_models.User(
-            id=str(uuid.uuid4()), name=MASTER_ADMIN_NAME, mobile=full_mobile,
+            id=str(uuid.uuid4()), tenant_id=PLATFORM_TENANT_ID, name=MASTER_ADMIN_NAME, mobile=full_mobile,
             country_code=MASTER_ADMIN_COUNTRY_CODE, password=hash_password(MASTER_ADMIN_PASSWORD),
             password_set=True, role="Management", email=MASTER_ADMIN_EMAIL, depot_id=None,
             otp_verified=True, is_master_admin=True,
