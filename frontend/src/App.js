@@ -6,6 +6,7 @@ import { Toaster } from "./components/ui/sonner";
 import { Sidebar } from "./components/layout/Sidebar";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { PermissionsProvider, usePermissions } from "./lib/permissions";
+import { ThemeProvider } from "./lib/theme";
 import { getOfflineQueueCount } from "./lib/offline";
 import { toast } from "sonner";
 
@@ -37,9 +38,10 @@ import FinalDispatchVerification from "./pages/FinalDispatchVerification";
 import RailwayZones from "./pages/RailwayZones";
 import VerifiedTruckDetailsPage from "./pages/VerifiedTruckDetails";
 import Downloads from "./pages/Downloads";
+import Tenants from "./pages/Tenants";
 
 // Protected Route Component with Dynamic Permissions
-const ProtectedRoute = ({ children, permission }) => {
+const ProtectedRoute = ({ children, permission, masterOnly }) => {
   const { user, loading: authLoading } = useAuth();
   const { hasPermission, loading: permLoading } = usePermissions();
   if (authLoading || permLoading) {
@@ -52,6 +54,11 @@ const ProtectedRoute = ({ children, permission }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Platform-level pages are restricted to the master admin.
+  if (masterOnly && !user.is_master_admin) {
+    return <Navigate to="/" replace />;
   }
 
   // Check dynamic permission for this route
@@ -253,9 +260,11 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-
-
-
+      <Route path="/tenants" element={
+        <ProtectedRoute permission="Tenants (View)" masterOnly>
+          <AppLayout><Tenants /></AppLayout>
+        </ProtectedRoute>
+      } />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -334,9 +343,11 @@ function App() {
         <BrowserRouter>
           <AuthProvider>
             <PermissionsProvider>
-              <AppRoutes />
-              <OfflineBanner />
-              <Toaster position="top-right" richColors />
+              <ThemeProvider>
+                <AppRoutes />
+                <OfflineBanner />
+                <Toaster position="top-right" richColors />
+              </ThemeProvider>
             </PermissionsProvider>
           </AuthProvider>
         </BrowserRouter>

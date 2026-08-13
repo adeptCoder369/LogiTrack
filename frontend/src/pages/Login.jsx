@@ -32,7 +32,8 @@ export default function Login() {
   const [loginData, setLoginData] = useState({
     mobile: '',
     password: '',
-    countryCode: '91'
+    countryCode: '91',
+    tenant: ''
   });
 
   // OTP Login states
@@ -40,6 +41,7 @@ export default function Login() {
     mobile: '',
     countryCode: '91',
     otp: '',
+    tenant: '',
     step: 'mobile' // mobile, otp
   });
 
@@ -50,6 +52,7 @@ export default function Login() {
     otp: '',
     newPassword: '',
     confirmPassword: '',
+    tenant: '',
     step: 'mobile' // mobile, otp, password
   });
 
@@ -60,6 +63,7 @@ export default function Login() {
     otp: '',
     newPassword: '',
     confirmPassword: '',
+    tenant: '',
     demoOtp: ''
   });
 
@@ -110,7 +114,8 @@ export default function Login() {
       const response = await authApi.login({
         mobile: loginData.mobile,
         country_code: loginData.countryCode,
-        password: loginData.password
+        password: loginData.password,
+        tenant: loginData.tenant || undefined
       });
 
       // Check if this is a first-time login
@@ -122,6 +127,7 @@ export default function Login() {
           otp: '',
           newPassword: '',
           confirmPassword: '',
+          tenant: loginData.tenant,
           demoOtp: response.data.demo_otp || ''
         });
         setActiveView('firstTimeSetup');
@@ -162,7 +168,8 @@ export default function Login() {
         mobile: firstTimeData.mobile,
         country_code: firstTimeData.countryCode,
         otp_code: firstTimeData.otp,
-        new_password: firstTimeData.newPassword
+        new_password: firstTimeData.newPassword,
+        tenant: firstTimeData.tenant || undefined
       });
 
       const { token, user } = response.data;
@@ -188,7 +195,8 @@ export default function Login() {
     try {
       const response = await authApi.requestLoginOtp({
         mobile: otpLoginData.mobile,
-        country_code: otpLoginData.countryCode
+        country_code: otpLoginData.countryCode,
+        tenant: otpLoginData.tenant || undefined
       });
       toast.success(response.data.message);
       setOtpLoginData(prev => ({ ...prev, step: 'otp' }));
@@ -207,7 +215,7 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      await loginWithOtp(otpLoginData.mobile, otpLoginData.countryCode, otpLoginData.otp);
+      await loginWithOtp(otpLoginData.mobile, otpLoginData.countryCode, otpLoginData.otp, otpLoginData.tenant || undefined);
       toast.success('Login successful!');
       navigate('/');
     } catch (error) {
@@ -227,7 +235,8 @@ export default function Login() {
     try {
       const response = await authApi.forgotPassword({
         mobile: forgotData.mobile,
-        country_code: forgotData.countryCode
+        country_code: forgotData.countryCode,
+        tenant: forgotData.tenant || undefined
       });
       toast.success(response.data.message);
       setForgotData(prev => ({ ...prev, step: 'otp' }));
@@ -262,11 +271,12 @@ export default function Login() {
         mobile: forgotData.mobile,
         country_code: forgotData.countryCode,
         otp_code: forgotData.otp,
-        new_password: forgotData.newPassword
+        new_password: forgotData.newPassword,
+        tenant: forgotData.tenant || undefined
       });
       toast.success('Password reset successfully! Please login.');
       setActiveView('main');
-      setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', step: 'mobile' });
+      setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' });
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to reset password');
     } finally {
@@ -284,14 +294,15 @@ export default function Login() {
     } else if (purpose === 'reset_password') {
       mobile = forgotData.mobile;
       countryCode = forgotData.countryCode;
-    } else if (purpose === 'first_time_setup') {
+      } else if (purpose === 'first_time_setup') {
       // Re-trigger login to get new OTP
       setLoading(true);
       try {
         const response = await authApi.login({
           mobile: firstTimeData.mobile,
           country_code: firstTimeData.countryCode,
-          password: '' // Empty password triggers OTP for first-time users
+          password: '', // Empty password triggers OTP for first-time users
+          tenant: firstTimeData.tenant || undefined
         });
         if (response.data.first_time_login) {
           toast.success(response.data.message);
@@ -389,6 +400,22 @@ export default function Login() {
     </div>
   );
 
+  const renderTenantInput = (data, setData, prefix = '') => (
+    <div className="space-y-2">
+      <Label htmlFor={`${prefix}tenant`}>
+        Tenant <span className="text-slate-400 font-normal">(optional — required only if your mobile exists in more than one workspace)</span>
+      </Label>
+      <Input
+        id={`${prefix}tenant`}
+        value={data.tenant}
+        onChange={(e) => setData({ ...data, tenant: e.target.value.trim().toLowerCase() })}
+        placeholder="Workspace slug"
+        className="pl-10"
+        data-testid={`${prefix}tenant`}
+      />
+    </div>
+  );
+
   const renderOtpInput = (value, onChange, purpose) => (
     <div className="space-y-2">
       <Label htmlFor={`${purpose}-otp`}>Enter OTP</Label>
@@ -434,6 +461,7 @@ export default function Login() {
       <CardContent>
         <form onSubmit={handlePasswordLogin} className="space-y-4">
           {renderMobileInput(loginData, setLoginData, 'login-')}
+          {renderTenantInput(loginData, setLoginData, 'login-')}
           <div className="space-y-2">
             <Label htmlFor="login-password">Password</Label>
             <div className="relative">
@@ -494,7 +522,7 @@ export default function Login() {
   const renderLoginOtp = () => (
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', step: 'mobile' }))}
+        {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', tenant: '', step: 'mobile' }))}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Login with OTP</CardTitle>
         <CardDescription>
           {otpLoginData.step === 'mobile'
@@ -506,6 +534,7 @@ export default function Login() {
         {otpLoginData.step === 'mobile' ? (
           <>
             {renderMobileInput(otpLoginData, setOtpLoginData, 'otpLogin-')}
+            {renderTenantInput(otpLoginData, setOtpLoginData, 'otpLogin-')}
             <Button
               onClick={handleRequestLoginOtp}
               className="w-full bg-orange-500 hover:bg-orange-600"
@@ -536,7 +565,7 @@ export default function Login() {
   const renderForgotPassword = () => (
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', step: 'mobile' }))}
+        {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' }))}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Reset Password</CardTitle>
         <CardDescription>
           {forgotData.step === 'mobile' && 'Enter your registered mobile number'}
@@ -548,6 +577,7 @@ export default function Login() {
         {forgotData.step === 'mobile' && (
           <>
             {renderMobileInput(forgotData, setForgotData, 'forgot-')}
+            {renderTenantInput(forgotData, setForgotData, 'forgot-')}
             <Button
               onClick={handleForgotPasswordSendOtp}
               className="w-full bg-orange-500 hover:bg-orange-600"
@@ -677,7 +707,7 @@ export default function Login() {
           type="button"
           onClick={() => {
             setActiveView('main');
-            setFirstTimeData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', demoOtp: '' });
+            setFirstTimeData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', demoOtp: '' });
           }}
           className="w-full text-sm text-slate-500 hover:text-slate-700 mt-2"
         >

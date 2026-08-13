@@ -184,4 +184,9 @@ PERMISSION_DEFAULTS = {
     "Downloads (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Downloads (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Downloads (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+
+    # Tenants (platform-level; effective gating is is_master_admin)
+    "Tenants (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Tenants (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Tenants (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
 }

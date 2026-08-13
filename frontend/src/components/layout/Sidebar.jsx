@@ -65,9 +65,14 @@ const allNavItems = [
 
 export const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, tenant } = useAuth();
   const { hasRoutePermission, loading, myDepots, myProducts } = usePermissions();
   const navigate = useNavigate();
+
+  // Tenant branding (Phase 0); falls back to the legacy InfoEIGHT look.
+  const branding = tenant?.branding || {};
+  const brandName = branding.name || 'IBRMCO';
+  const brandLogo = branding.logo || 'https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png';
 
   const handleLogout = () => {
     logout();
@@ -92,9 +97,14 @@ export const Sidebar = () => {
       ? weightmentNavItems
       : user?.role === 'Dispatch Verifier'
         ? dispatchVerifierNavItems
-        : allNavItems.filter(item => {
-          return hasRoutePermission(item.to);
-        });
+        : [
+            ...allNavItems.filter(item => {
+              return hasRoutePermission(item.to);
+            }),
+            ...(user?.is_master_admin
+              ? [{ to: '/tenants', icon: ShieldCheck, label: 'Tenants' }]
+              : []),
+          ];
 
   return (
     <>
@@ -105,7 +115,7 @@ export const Sidebar = () => {
             <Truck className="w-4 h-4 text-white" />
           </div>
           <span className="text-sm font-bold text-white tracking-tight font-sans">
-            IBRMCO
+            {brandName}
           </span>
         </div>
         <button
@@ -141,8 +151,8 @@ export const Sidebar = () => {
         {/* UPPER SECTION: Logo Header */}
         <div className="hidden lg:flex flex-col items-center justify-center px-6 h-24 border-b border-slate-800/60 bg-slate-950/20">
           <img
-            src="https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png"
-            alt="InfoEIGHT"
+            src={brandLogo}
+            alt={brandName}
             className="h-7 mb-2 opacity-90 object-contain"
           />
           <div className="flex items-center gap-2.5">
@@ -150,7 +160,7 @@ export const Sidebar = () => {
               <Truck className="w-3.5 h-3.5 text-white" />
             </div>
             <h1 className="text-sm font-bold text-white tracking-wide uppercase font-sans">
-              IBRMCO  
+              {brandName}
             </h1>
           </div>
         </div>

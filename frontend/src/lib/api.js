@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { enqueueOfflineRequest, isMutation, isOnline } from './offline';
 
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://dashboard.infoeight.com/api';
+// Phase 0: all API routes live under /api/v1. A configured base ending in
+// /api is auto-upgraded so old .env files keep working.
+export const BACKEND_URL = (
+  process.env.REACT_APP_BACKEND_URL || 'https://dashboard.infoeight.com/api/v1'
+).replace(/\/api$/, '/api/v1');
 // export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://logitrack-backend-bdv4.onrender.com';
 // export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ;
 console.log('BACKEND_URL_______________________________:', BACKEND_URL);
@@ -273,6 +277,14 @@ export const permissionsApi = {
   update: (data) => api.put('/permissions', data),
   toggle: (module, role) => api.put(`/permissions/${encodeURIComponent(module)}/${encodeURIComponent(role)}`),
   reset: () => api.post('/permissions/reset'),
+};
+
+// Tenants (Phase 0)
+export const tenantApi = {
+  getConfig: () => api.get('/tenant/config'),
+  getAll: () => api.get('/tenants'),
+  create: (data) => api.post('/tenants', data),
+  update: (id, data) => api.put(`/tenants/${id}`, data),
 };
 
 // Product Access

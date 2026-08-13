@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authApi, refreshDownloadToken, clearDownloadToken } from './api';
+import { authApi, tenantApi, refreshDownloadToken, clearDownloadToken } from './api';
 import { normalizeRoleName } from './roleUtils';
 
 const AuthContext = createContext(null);
@@ -10,12 +10,24 @@ const DOWNLOAD_TOKEN_REFRESH_MS = 20 * 60 * 1000;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const loadTenantConfig = async () => {
+    try {
+      const { data } = await tenantApi.getConfig();
+      setTenant(data);
+      return data;
+    } catch (e) {
+      setTenant(null);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    
+
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
       // Verify token is still valid
@@ -24,6 +36,7 @@ export const AuthProvider = ({ children }) => {
           setUser(res.data);
           localStorage.setItem('user', JSON.stringify(res.data));
           refreshDownloadToken();
+          loadTenantConfig();
         })
         .catch(() => {
           localStorage.removeItem('token');
@@ -43,28 +56,31 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(id);
   }, [user]);
 
-  const login = async (username, password, countryCode = '91') => {
-    const response = await authApi.login({ mobile: username, password, country_code: countryCode });
+  const login = async (username, password, countryCode = '91', tenantSlug = null) => {
+    const response = await authApi.login({ mobile: username, password, country_code: countryCode, tenant: tenantSlug || undefined });
     const { token, user: userData } = response.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     await refreshDownloadToken();
+    await loadTenantConfig();
     return userData;
   };
 
-  const loginWithOtp = async (mobile, countryCode, otpCode) => {
-    const response = await authApi.verifyLoginOtp({ 
-      mobile, 
-      country_code: countryCode, 
+  const loginWithOtp = async (mobile, countryCode, otpCode, tenantSlug = null) => {
+    const response = await authApi.verifyLoginOtp({
+      mobile,
+      country_code: countryCode,
       otp_code: otpCode,
-      purpose: 'login'
+      purpose: 'login',
+      tenant: tenantSlug || undefined,
     });
     const { token, user: userData } = response.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     await refreshDownloadToken();
+    await loadTenantConfig();
     return userData;
   };
 
@@ -77,6 +93,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
     clearDownloadToken();
     setUser(null);
+    setTenant(null);
   };
 
   const hasRole = (roles) => {
@@ -87,7 +104,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithOtp, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, tenant, loading, login, loginWithOtp, logout, hasRole }}>
       {children}
     </AuthContext.Provider>
   );
@@ -99,4 +116,9 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+};
+
+export const useTenant = () => {
+  const { tenant } = useAuth();
+  return tenant;
 };

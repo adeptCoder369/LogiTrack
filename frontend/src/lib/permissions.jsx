@@ -38,6 +38,7 @@ const ROUTE_TO_PERMISSION = {
   '/lifting-reports': 'Lifting Reports',
   '/purchase-orders': 'Purchase Orders (View)',
   '/downloads': 'Downloads (View)',
+  '/tenants': 'Tenants (View)',
 };
 
 // Map actions to permission keys
