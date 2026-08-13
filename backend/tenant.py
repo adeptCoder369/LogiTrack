@@ -37,20 +37,6 @@ def set_tenant_scope(user: dict) -> None:
     _tenant_var.set(None if user.get("is_master_admin") else user.get("tenant_id"))
 
 
-def feature_enabled(key: str) -> bool:
-    """Feature flag for the current tenant, falling back to global defaults.
-
-    Requires the tenant's flags to have been loaded for this request (done in
-    get_current_user via ensure_tenant_active). Master admin / platform
-    context defaults to enabled.
-    """
-    ctx = _tenant_var.get()
-    if ctx is None:
-        return bool(DEFAULT_FEATURE_FLAGS.get(key, True))
-    flags = _tenant_flags_var.get() or {}
-    return bool(flags.get(key, DEFAULT_FEATURE_FLAGS.get(key, True)))
-
-
 async def _load_tenant_row(tenant_id: str):
     from sqlalchemy import select
     from models_sqlalchemy import Tenant
@@ -122,12 +108,14 @@ async def get_tenant_config(user: dict) -> dict:
 def feature_enabled(key: str) -> bool:
     """Feature flag for the current tenant, falling back to global defaults.
 
-    Requires the tenant's flags to have been loaded for this request (done in
-    get_current_user via ensure_tenant_active). Master admin / platform
-    context defaults to enabled.
+    Whitelist semantics: a key is enabled only when present in the tenant's
+    feature_flags or in DEFAULT_FEATURE_FLAGS. Requires the tenant's flags to
+    have been loaded for this request (done in get_current_user via
+    ensure_tenant_active). Master admin / platform context uses the global
+    defaults.
     """
     ctx = _tenant_var.get()
     if ctx is None:
-        return bool(DEFAULT_FEATURE_FLAGS.get(key, True))
+        return bool(DEFAULT_FEATURE_FLAGS.get(key, False))
     flags = _tenant_flags_var.get() or {}
-    return bool(flags.get(key, DEFAULT_FEATURE_FLAGS.get(key, True)))
+    return bool(flags.get(key, DEFAULT_FEATURE_FLAGS.get(key, False)))
