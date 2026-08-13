@@ -392,18 +392,244 @@ export const MultiPhotoUpload = ({
 };
 
 // Simplified photo upload component specifically for photos with camera
-export const PhotoUpload = ({ 
-  value, 
-  onChange, 
-  label = 'Upload Photo'
-}) => {
-  return (
-    <FileUpload
-      value={value}
-      onChange={onChange}
-      label={label}
-      accept="image/*"
-      showCameraOption={true}
-    />
-  );
-};
+ export const PhotoUpload = ({ 
+   value, 
+   onChange, 
+   label = 'Upload Photo'
+ }) => {
+   return (
+     <FileUpload
+       value={value}
+       onChange={onChange}
+       label={label}
+       accept="image/*"
+       showCameraOption={true}
+     />
+   );
+ };
+
+// Dual file upload component for front/back documents
+  export const DualFileUpload = ({
+    value,
+    onChange,
+    label = 'Upload Document',
+    accept = '.pdf,.jpg,.jpeg,.png',
+    showCameraOption = true
+  }) => {
+    const [uploading, setUploading] = useState(false);
+    const [originalNameFront, setOriginalNameFront] = useState('');
+    const [originalNameBack, setOriginalNameBack] = useState('');
+    const fileInputRefFront = useRef(null);
+    const fileInputRefBack = useRef(null);
+    const cameraInputRefFront = useRef(null);
+    const cameraInputRefBack = useRef(null);
+
+    // Ensure value is always an array with front/back structure
+    const files = value || { front: null, back: null };
+    const isImageUpload = accept.includes('image') || accept.includes('.jpg') || accept.includes('.jpeg') || accept.includes('.png') || accept.includes('.gif') || accept === '*';
+
+    const handleFileChange = async (e, side) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setUploading(true);
+      try {
+        const result = await uploadFile(file);
+        const newValue = { ...files, [side]: result.file_id };
+        onChange(newValue);
+        if (side === 'front') {
+          setOriginalNameFront(result.original_name || file.name);
+        } else {
+          setOriginalNameBack(result.original_name || file.name);
+        }
+        toast.success(`${file.name} uploaded successfully`);
+      } catch (error) {
+        toast.error('Failed to upload file');
+        console.error('Upload error:', error);
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const handleRemove = (side) => {
+      const newValue = { ...files, [side]: null };
+      onChange(newValue);
+      if (side === 'front') {
+        setOriginalNameFront('');
+      } else {
+        setOriginalNameBack('');
+      }
+    };
+
+    const openFileSelector = (side) => {
+      if (side === 'front') {
+        fileInputRefFront.current?.click();
+      } else {
+        fileInputRefBack.current?.click();
+      }
+    };
+
+    const openCamera = async (side) => {
+      if (isNativePlatform()) {
+        try {
+          const file = await captureCameraFile();
+          const event = { target: { files: [file] } };
+          await handleFileChange(event, side);
+          return;
+        } catch (error) {
+          toast.error(error.message || 'Failed to capture photo');
+          return;
+        }
+      }
+      if (side === 'front') {
+        cameraInputRefFront.current?.click();
+      } else {
+        cameraInputRefBack.current?.click();
+      }
+    };
+
+    const renderThumbnail = (fileId, displayName, side) => {
+      if (!fileId) return null;
+      
+      // Handle both string file_id and object with file_id
+      const actualFileId = typeof fileId === 'string' ? fileId : fileId.file_id;
+
+      return (
+        <div className="relative group">
+          <div className="flex flex-col items-center gap-1">
+            <div className="relative w-20 h-16 bg-white rounded border overflow-hidden">
+              {isImageUpload ? (
+                <img
+                  src={getFileUrl(actualFileId)}
+                  alt={side}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <FileText className="w-8 h-8 text-blue-500" />
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-0.5">
+                {side === 'front' ? 'Front' : 'Back'}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemove(side)}
+                className="absolute -top-1 -right-1 p-0.5 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+            <a
+              href={getFileUrl(actualFileId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:underline truncate max-w-[80px]"
+              title={displayName}
+            >
+              {displayName || 'View'}
+            </a>
+          </div>
+        </div>
+      );
+    };
+
+    const renderUploadZone = (side, otherSideHasFile) => {
+      const rawFile = side === 'front' ? files.front : files.back;
+      // Handle both string file_id and object with file_id
+      const hasFile = rawFile ? (typeof rawFile === 'string' ? true : !!rawFile.file_id) : false;
+
+      if (hasFile && uploading) {
+        return (
+          <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-lg border">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-gray-500">Uploading...</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-2">
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            onClick={() => openFileSelector(side)}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <UploadCloud className="w-6 h-6 text-gray-400" />
+              <span className="text-xs text-gray-500 text-center">Side {side === 'front' ? 'Front' : 'Back'}</span>
+            </div>
+          </div>
+          {isImageUpload && showCameraOption && !hasFile && (
+            <button
+              type="button"
+              onClick={() => openCamera(side)}
+              className="flex items-center justify-center gap-1 w-full py-2 px-3 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-colors text-xs"
+            >
+              <CameraIcon className="w-3 h-3 text-blue-600" />
+              <span className="font-medium text-blue-600">Camera</span>
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-2">
+        {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
+
+        {/* Hidden file inputs */}
+        <input
+          ref={fileInputRefFront}
+          type="file"
+          accept={accept}
+          onChange={(e) => handleFileChange(e, 'front')}
+          className="hidden"
+        />
+        <input
+          ref={fileInputRefBack}
+          type="file"
+          accept={accept}
+          onChange={(e) => handleFileChange(e, 'back')}
+          className="hidden"
+        />
+        {isImageUpload && showCameraOption && (
+          <>
+            <input
+              ref={cameraInputRefFront}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => handleFileChange(e, 'front')}
+              className="hidden"
+            />
+            <input
+              ref={cameraInputRefBack}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => handleFileChange(e, 'back')}
+              className="hidden"
+            />
+          </>
+        )}
+
+        {/* Uploaded files thumbnails */}
+        {(files.front || files.back) && (
+          <div className="grid grid-cols-2 gap-2">
+            {renderThumbnail(files.front, originalNameFront, 'front')}
+            {renderThumbnail(files.back, originalNameBack, 'back')}
+          </div>
+        )}
+
+        {/* Upload zones */}
+        {uploading ? (
+          <div className="text-center p-3 text-xs text-gray-500">Uploading...</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {renderUploadZone('front', files.back)}
+            {renderUploadZone('back', files.front)}
+          </div>
+        )}
+      </div>
+    );
+  };

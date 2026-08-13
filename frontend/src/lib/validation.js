@@ -74,15 +74,12 @@ export const validators = {
     return null;
   },
 
-  // Pin Code (6 digits)
+  // Pin Code
   pincode: (value, fieldName = 'Pin code') => {
     if (!value) return null;
     const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length !== 6) {
-      return `${fieldName} must be exactly 6 digits`;
-    }
-    if (!PATTERNS.pincode.test(cleaned)) {
-      return `Please enter a valid ${fieldName}`;
+    if (cleaned.length === 0) {
+      return `${fieldName} must be a valid number`;
     }
     return null;
   },
@@ -255,7 +252,7 @@ export const validateForm = (data, schema) => {
  */
 export const formatters = {
   mobile: (value) => value.replace(/\D/g, '').slice(0, 10),
-  pincode: (value) => value.replace(/\D/g, '').slice(0, 6),
+  pincode: (value) => value.replace(/\D/g, ''),
   aadhaar: (value) => value.replace(/\D/g, '').slice(0, 12),
   pan: (value) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10),
   gst: (value) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15),

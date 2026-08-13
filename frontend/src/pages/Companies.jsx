@@ -11,17 +11,13 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { companiesApi, importApi } from '../lib/api';
+import { companiesApi, importApi, getFileUrl } from '../lib/api';
 import { validators, formatters } from '../lib/validation';
 import { toast } from 'sonner';
 import { Plus, Upload, Download, Users, Building2, X, Edit, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { usePermissions } from '../lib/permissions';
 import { Can } from '../components/Can';
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-
-const API_BASE = `${BACKEND_URL}/api`;
-
 
 const columns = [
   {
@@ -31,7 +27,7 @@ const columns = [
       <div className="flex items-center gap-2">
         {row.logo_file_id && (
           <img
-            src={`${API_BASE}/uploads/${row.logo_file_id}`}
+            src={getFileUrl(row.logo_file_id)}
             alt={v}
             className="w-8 h-8 rounded-full object-cover"
           />
@@ -42,15 +38,15 @@ const columns = [
             Client
           </span>
         )}
-        {row.company_type && (row.company_type === 'Source' || row.company_type === 'Both') && (
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-            {row.company_type === 'Both' ? 'Source+Client' : 'Source'}
-          </span>
-        )}
       </div>
     )
   },
   { key: 'trade_name', label: 'Trade Name' },
+  { key: 'company_type', label: 'Type', render: (v) => (
+    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${v === 'Vendor' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+      {v || 'Client'}
+    </span>
+  )},
   { key: 'city', label: 'City' },
   { key: 'state', label: 'State' },
   { key: 'gst_number', label: 'GST Number', render: (v) => <span className="mono text-sm">{v || '-'}</span> },
@@ -58,9 +54,9 @@ const columns = [
   { key: 'telephone', label: 'Phone' },
   { 
     key: 'logo_file_id',
-    label: 'Logo',
-    render: (v) => v ? <img src={`${API_BASE}/uploads/${v}`} alt="Logo" className="w-6 h-6 rounded-full object-cover" /> : <span className="text-gray-400">No Logo</span>
-  },
+     label: 'Logo',
+    render: (v) => v ? <img src={getFileUrl(v)} alt="Logo" className="w-6 h-6 rounded-full object-cover" /> : <span className="text-gray-400">No Logo</span>
+    },
 ];
 
 const indianStates = [
@@ -530,7 +526,7 @@ export default function Companies() {
   };
 
   const downloadTemplate = () => {
-    window.open(importApi.template('companies'), '_blank');
+    window.open(importApi.getTemplate('companies'), '_blank');
     toast.success('Template download started');
   };
 
@@ -539,15 +535,25 @@ export default function Companies() {
     if (!file) return;
 
     setImporting(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const res = await importApi.companies(formData);
+      const res = await importApi.bulkImport('companies', file);
       toast.success(`Imported ${res.data.imported} companies successfully`);
+      if (res.data.errors?.length) {
+        toast.error(res.data.errors.slice(0, 5).join('\n'));
+      }
       fetchCompanies();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to import companies');
+      const detail = error.response?.data?.detail;
+      let message = 'Failed to import companies';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail
+          .map((d) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d)))
+          .join('; ');
+      }
+      toast.error(message);
     } finally {
       setImporting(false);
       if (fileInputRef.current) {
@@ -835,22 +841,24 @@ export default function Companies() {
           <TabsContent value="financial" className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <Label>Company Type</Label>
+                <Select value={formData.company_type} onValueChange={(v) => setFormData({ ...formData, company_type: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Client">Client</SelectItem>
+                    <SelectItem value="Vendor">Vendor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label htmlFor="gst_number">GST Number</Label>
                 <Input
                   id="gst_number"
                   value={formData.gst_number}
                   onChange={(e) => setFormData({ ...formData, gst_number: e.target.value.toUpperCase() })}
                   placeholder="GSTIN"
-                  className="mono"
-                />
-              </div>
-              <div>
-                <Label htmlFor="pan_number">PAN Number</Label>
-                <Input
-                  id="pan_number"
-                  value={formData.pan_number}
-                  onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase() })}
-                  placeholder="PAN"
                   className="mono"
                 />
               </div>
@@ -906,20 +914,6 @@ export default function Companies() {
                     <SelectItem value="Registered">Registered</SelectItem>
                     <SelectItem value="Unregistered">Unregistered</SelectItem>
                     <SelectItem value="Composition">Composition</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Company Type</Label>
-                <Select value={formData.company_type} onValueChange={(v) => setFormData({ ...formData, company_type: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select company type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Client">Client (Destination only)</SelectItem>
-                    <SelectItem value="Source">Source (Inventory source)</SelectItem>
-                    <SelectItem value="Both">Both (Source & Client)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

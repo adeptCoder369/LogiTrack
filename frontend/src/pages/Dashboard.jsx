@@ -40,6 +40,7 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import { LoaderDashboard } from '@/components/dashboard/LoaderDashboard';
+import { WeightmentDashboard } from '@/components/dashboard/WeightmentDashboard';
 import { ManagementDashboard } from '@/components/dashboard/ManagementDashboard';
 
 export default function Dashboard() {
@@ -123,82 +124,10 @@ export default function Dashboard() {
       {hasRole('Loader') && !hasRole('Management') && (
         <LoaderDashboard />
       )}
-
-      {/* Depot Manager Dashboard */}
-      {hasRole('Depot Manager') && !hasRole('Management') && (
-        <div className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <Card className="border-l-4 border-l-amber-500 hover:shadow-lg transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Pending Verification</p>
-                    <p className="text-3xl font-bold text-amber-600">{analytics?.liftings_by_status?.pending || 0}</p>
-                    <p className="text-xs text-gray-400 mt-1">Awaiting your action</p>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <Button
-                  className="w-full mt-4 bg-amber-500 hover:bg-amber-600"
-                  onClick={() => navigate('/verification')}
-                >
-                  Verify Now <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Verified Today</p>
-                    <p className="text-3xl font-bold text-green-600">{analytics?.liftings_by_status?.verified || 0}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <Button
-                  className="w-full mt-4"
-                  variant="outline"
-                  onClick={() => navigate('/inventory')}
-                >
-                  View Inventory <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Pending Liftings List */}
-          {pendingLiftings.length > 0 && (
-            <Card>
-              <div className="p-4 border-b bg-amber-50">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                  Pending Verifications
-                </h3>
-              </div>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {pendingLiftings.map((lifting) => (
-                    <div key={lifting.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
-                      <div>
-                        <p className="font-medium font-mono">{lifting.lifting_no}</p>
-                        <p className="text-sm text-gray-500">{lifting.product_name} - {lifting.quantity_mt} MT</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-mono">{lifting.vehicle_number}</p>
-                        <p className="text-xs text-gray-400">From: {lifting.loading_point_name}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      
+      {/* Weightment Dashboard */}
+      {hasRole('Weightment') && !hasRole('Management') && (
+        <WeightmentDashboard pendingLiftings={pendingLiftings} />
       )}
 
       {/* Depot Staff Dashboard */}
@@ -253,26 +182,28 @@ export default function Dashboard() {
       {hasRole('Depot Staff') && !hasRole('Management') && availableNavItems.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4">Quick Links</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {availableNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Card
-                  key={item.to}
-                  className="cursor-pointer hover:shadow-lg hover:border-slate-300 transition-all"
-                  onClick={() => navigate(item.to)}
-                >
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
-                      <Icon className="w-5 h-5 text-slate-700" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{item.label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="overflow-x-auto min-w-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {availableNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Card
+                    key={item.to}
+                    className="cursor-pointer hover:shadow-lg hover:border-slate-300 transition-all"
+                    onClick={() => navigate(item.to)}
+                  >
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
+                        <Icon className="w-5 h-5 text-slate-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{item.label}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -285,29 +216,31 @@ export default function Dashboard() {
       )}
 
       {/* Quick Links for roles without a specific dashboard (Admin, etc.) */}
-      {!hasRole('Management') && !hasRole('Loader') && !hasRole('Depot Manager') && !hasRole('Depot Staff') && availableNavItems.length > 0 && (
+      {!hasRole('Management') && !hasRole('Loader') && !hasRole('Weightment') && !hasRole('Depot Staff') && availableNavItems.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4">Quick Links</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {availableNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Card
-                  key={item.to}
-                  className="cursor-pointer hover:shadow-lg hover:border-slate-300 transition-all"
-                  onClick={() => navigate(item.to)}
-                >
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
-                      <Icon className="w-5 h-5 text-slate-700" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{item.label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="overflow-x-auto min-w-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {availableNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Card
+                    key={item.to}
+                    className="cursor-pointer hover:shadow-lg hover:border-slate-300 transition-all"
+                    onClick={() => navigate(item.to)}
+                  >
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
+                        <Icon className="w-5 h-5 text-slate-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{item.label}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

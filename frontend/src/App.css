@@ -2,12 +2,15 @@
 
 .App {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* Layout */
 .main-layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .content-area {
@@ -15,12 +18,23 @@
   margin-left: 256px;
   min-height: 100vh;
   background-color: #F8FAFC;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 @media (max-width: 1024px) {
   .content-area {
     margin-left: 0;
   }
+
+  .main-layout {
+    overflow-x: hidden;
+  }
+}
+
+.min-w-0 {
+  min-width: 0;
 }
 
 /* Responsive sidebar */

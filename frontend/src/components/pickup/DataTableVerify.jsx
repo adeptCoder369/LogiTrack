@@ -9,11 +9,11 @@ import {
 import { Button } from '../ui/button';
 import { Edit, Trash2, Eye } from 'lucide-react';
 
-export const PickupDataTable = ({ 
-  columns, 
-  data, 
-  onEdit, 
-  onDelete, 
+export const VerifyPickupDataTable = ({
+  columns,
+  data,
+  onEdit,
+  onDelete,
   onView,
   customActions,
   loading = false,
@@ -45,8 +45,8 @@ export const PickupDataTable = ({
         <TableHeader>
           <TableRow className="bg-gray-50">
             {columns.map((col) => (
-              <TableHead 
-                key={col.key} 
+              <TableHead
+                key={col.key}
                 className="text-xs font-semibold text-gray-500 uppercase tracking-wider py-3"
               >
                 {col.label}
@@ -61,13 +61,16 @@ export const PickupDataTable = ({
         </TableHeader>
         <TableBody>
           {data.map((row, idx) => (
-            <TableRow 
-              key={row.id || idx} 
-              className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-  row.status === 'loaded' ? 'bg-green-50' : 
-  row.status === 'loading_started' ? 'bg-amber-50' : 
-  row.status === 'verified' ? 'bg-blue-50' : ''
-}`}
+            <TableRow
+              key={row.id || idx}
+              className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${row.status === 'loaded' ? 'bg-green-50' :
+                row.status === 'loading_started' ? 'bg-amber-50' :
+                  row.status === 'verified' ? 'bg-blue-50' :
+                    row.status === 'weightment_done' ? 'bg-purple-50' :
+                      row.status === 'final_verified' ? 'bg-indigo-50' :
+                        row.status === 'rejected' ? 'bg-red-50' :
+                          ''
+                }`}
               data-testid={`table-row-${idx}`}
             >
               {columns.map((col) => (

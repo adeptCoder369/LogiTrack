@@ -1,7 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authApi } from './api';
+import { authApi, refreshDownloadToken, clearDownloadToken } from './api';
+import { normalizeRoleName } from './roleUtils';
 
 const AuthContext = createContext(null);
+
+// The download token lives 30 minutes server-side; renew well inside that so a
+// download link is never built from an expired one.
+const DOWNLOAD_TOKEN_REFRESH_MS = 20 * 60 * 1000;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -18,10 +23,12 @@ export const AuthProvider = ({ children }) => {
         .then(res => {
           setUser(res.data);
           localStorage.setItem('user', JSON.stringify(res.data));
+          refreshDownloadToken();
         })
         .catch(() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          clearDownloadToken();
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -30,12 +37,19 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!user) return undefined;
+    const id = setInterval(refreshDownloadToken, DOWNLOAD_TOKEN_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [user]);
+
   const login = async (username, password, countryCode = '91') => {
     const response = await authApi.login({ mobile: username, password, country_code: countryCode });
     const { token, user: userData } = response.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    await refreshDownloadToken();
     return userData;
   };
 
@@ -50,40 +64,30 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    await refreshDownloadToken();
     return userData;
   };
 
-  const register = async (data) => {
-    const response = await authApi.register({
-      name: data.name,
-      mobile: data.mobile,
-      country_code: data.country_code || '91',
-      password: data.password,
-      role: data.role,
-      email: data.email,
-      depot_id: data.depot_id
-    });
-    const { token, user: userData } = response.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-    return userData;
-  };
+  // No self-registration: accounts are created by an Admin or Management user
+  // through the User Management screen, and the holder sets their own password
+  // via the first-time-setup OTP flow on the login page.
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    clearDownloadToken();
     setUser(null);
   };
 
   const hasRole = (roles) => {
     if (!user) return false;
-    if (typeof roles === 'string') return user.role === roles;
-    return roles.includes(user.role);
+    const normalizedRole = normalizeRoleName(user.role);
+    if (typeof roles === 'string') return normalizedRole === roles;
+    return roles.includes(normalizedRole);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithOtp, register, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithOtp, logout, hasRole }}>
       {children}
     </AuthContext.Provider>
   );

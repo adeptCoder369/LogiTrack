@@ -5,7 +5,8 @@ import {
   Loader2, 
   CheckCircle2, 
   ShieldCheck, 
-  RefreshCw 
+  RefreshCw,
+  Scale
 } from 'lucide-react';
 
 export default function PickupStatsCards({ stats, activeStatus = '', onStatusChange }) {
@@ -15,6 +16,7 @@ export default function PickupStatsCards({ stats, activeStatus = '', onStatusCha
     scheduled: stats?.scheduled || 0,
     loading: stats?.loading || 0,
     loaded: stats?.loaded || 0,
+    weightment_done: stats?.weightment_done || 0,
     verified: stats?.verified || 0,
     rescheduled: stats?.rescheduled || 0,
   };
@@ -49,7 +51,7 @@ export default function PickupStatsCards({ stats, activeStatus = '', onStatusCha
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
       {renderCard(
         '',
         'Total Pickups',
@@ -92,6 +94,17 @@ export default function PickupStatsCards({ stats, activeStatus = '', onStatusCha
         </div>,
         'border-slate-200 bg-emerald-50/40 hover:border-emerald-400 hover:bg-emerald-100 text-emerald-800',
         'border-emerald-600 bg-emerald-100 text-emerald-800'
+      )}
+
+      {renderCard(
+        'weightment_done',
+        'Weightment Done',
+        data.weightment_done,
+        <div className="bg-purple-100/80 rounded-lg text-purple-600 p-2">
+          <Scale className="w-5 h-5" />
+        </div>,
+        'border-slate-200 bg-purple-50/40 hover:border-purple-400 hover:bg-purple-100 text-purple-800',
+        'border-purple-600 bg-purple-100 text-purple-800'
       )}
 
       {renderCard(

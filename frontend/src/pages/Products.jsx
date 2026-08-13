@@ -186,7 +186,7 @@ export default function Products() {
 
   const categoryOptions = ['Cement', 'Steel', 'Iron Ore', 'Coal', 'Limestone', 'Fly Ash', 'Sand', 'Aggregates', 'Other'];
   const uomOptions = ['MT', 'Kg', 'Liters', 'Pieces', 'Bags'];
-  const roles = ['Admin', 'Management', 'Loader', 'Depot Manager', 'Depot Supervisor', 'Depot Staff'];
+  const roles = ['Admin', 'Management', 'Loader', 'Weightment', 'Dispatch Verifier', 'Depot Supervisor', 'Depot Staff'];
 
   const columns = [
     { key: 'product_name', label: 'Product Name' },

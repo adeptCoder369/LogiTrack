@@ -278,8 +278,9 @@ companyId: urlCompanyId || '',
         const poRes = results[idx++];
         setPurchaseOrders(poRes.data.filter(p => p.status !== 'Completed'));
 
-        setLiftings(results[idx].data);
-        setFilteredLiftings(results[idx].data);
+        const visibleLiftings = results[idx].data.filter(l => l.lifting_type !== 'Secondary');
+        setLiftings(visibleLiftings);
+        setFilteredLiftings(visibleLiftings);
         idx++;
 
         setProducts(results[idx++].data);
@@ -310,12 +311,9 @@ companyId: urlCompanyId || '',
 
     if (po) {
       const transportMode = po.transport_mode || 'Road';
+      const isCompanySource = po.source_type === 'Company';
+      
       setSelectedTransportMode(transportMode);
-
-      // Determine loading point type based on PO source type
-      const loadingPointType = po.source_type === 'Company' ? 'Company' : 'Depot';
-      const loadingPointId = po.source_type === 'Company' ? po.source_company_id : po.depot_id;
-      const loadingPointName = po.source_type === 'Company' ? po.source_company_name : po.depot_name;
 
       setFormData({
         ...formData,
@@ -326,9 +324,9 @@ companyId: urlCompanyId || '',
         product_name: po.product_name,
         product_code: po.product_code,
 
-        loading_point_type: loadingPointType,
-        loading_point_id: loadingPointId,
-        loading_point_name: loadingPointName,
+        loading_point_type: isCompanySource ? 'Company' : 'Depot',
+        loading_point_id: po.depot_id,
+        loading_point_name: po.depot_name,
 
         unloading_point_type: 'Company',
         unloading_point_id: po.to_company_id,
@@ -342,6 +340,9 @@ companyId: urlCompanyId || '',
 
   const applyFilters = () => {
     let filtered = [...liftings];
+    
+    // Always exclude Secondary liftings from display
+    filtered = filtered.filter(l => l.lifting_type !== 'Secondary');
     
     if (filters.dateFrom) {
       filtered = filtered.filter(l => l.date_of_loading >= filters.dateFrom);
@@ -387,7 +388,9 @@ companyId: urlCompanyId || '',
     }
     // NEW: Filter by company (unloading point)
     if (filters.companyId) {
-      filtered = filtered.filter(l => l.unloading_point_id === filters.companyId);
+      filtered = filtered.filter(l => 
+        l.unloading_point_type === 'Company' && l.unloading_point_id === filters.companyId
+      );
     }
     
     setFilteredLiftings(filtered);
@@ -429,6 +432,10 @@ companyId: urlCompanyId || '',
     
     setLiftingType(type);
     
+    const unloadingPointName = urlCompanyId 
+      ? companies.find(c => c.id === urlCompanyId)?.name || ''
+      : '';
+    
     setFormData({
       lifting_type: type,
       transport_mode: 'Road',
@@ -460,9 +467,9 @@ companyId: urlCompanyId || '',
       gross_weight_mt: '',
       net_weight_mt: '',
       weight_slip: '',
-      unloading_point_type: 'Depot',
-      unloading_point_id: '',
-      unloading_point_name: '',
+      unloading_point_type: urlUnloadingPointType || 'Depot',
+      unloading_point_id: urlCompanyId || '',
+      unloading_point_name: unloadingPointName,
     });
     setSelectedTransportMode('Road');
     setVehicleSearch('');
@@ -475,7 +482,6 @@ companyId: urlCompanyId || '',
     const order = deliveryOrders.find(o => o.id === orderId);
     if (order) {
       const transportMode = order.transport_mode || 'Road';
-      const destinationType = order.destination_type || 'Depot';
       setSelectedTransportMode(transportMode);
       
       setFormData({
@@ -486,11 +492,12 @@ companyId: urlCompanyId || '',
         product_id: order.product_id,
         product_name: order.product_name,
         product_code: order.product_code || '',
+        loading_point_type: order.from_company_id ? 'Company' : 'Depot',
         loading_point_id: order.from_company_id || '',
         loading_point_name: order.from_company_name || '',
-        unloading_point_type: destinationType === 'Company' ? 'Company' : 'Depot',
-        unloading_point_id: destinationType === 'Company' ? order.to_company_id : order.to_depot_id,
-        unloading_point_name: destinationType === 'Company' ? order.to_company_name : order.to_depot_name,
+        unloading_point_type: order.to_company_id ? 'Company' : 'Depot',
+        unloading_point_id: order.to_company_id || order.to_depot_id || '',
+        unloading_point_name: order.to_company_name || order.to_depot_name || '',
         // Railway siding info from DO
         loading_siding_id: order.loading_siding_id || '',
         loading_siding_name: order.loading_siding_name || '',
@@ -769,6 +776,23 @@ companyId: urlCompanyId || '',
           return;
         }
       }
+    const normalizedVehicleNumber = (formData.vehicle_number || '').trim().toUpperCase();
+    const duplicateVehicle = liftings.some((item) => {
+      if (!normalizedVehicleNumber || !formData.date_of_loading) return false;
+      if (selectedItem && item.id === selectedItem.id) return false;
+      if (item.date_of_loading !== formData.date_of_loading) return false;
+      if (item.vehicle_id && formData.vehicle_id && item.vehicle_id === formData.vehicle_id) return true;
+      if (item.vehicle_number && normalizedVehicleNumber) {
+        return item.vehicle_number.toUpperCase() === normalizedVehicleNumber;
+      }
+      return false;
+    });
+
+    if (duplicateVehicle) {
+      toast.error(`Vehicle ${normalizedVehicleNumber} is already assigned for ${formData.date_of_loading}`);
+      return;
+    }
+
     // Validation
     const errors = [];
 	if (
@@ -1042,7 +1066,7 @@ companyId: urlCompanyId || '',
       title="Liftings"
       subtitle="Truck-wise loading records"
       actions={
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
             {canViewLiftings && (
 			  <Button 
 				variant="outline"
@@ -1050,7 +1074,7 @@ companyId: urlCompanyId || '',
 				disabled={filteredLiftings.length === 0}
 			  >
 				<Download className="w-4 h-4 mr-2" />
-				Export Excel
+				Export
 			  </Button>
 			)}
 
@@ -1060,7 +1084,7 @@ companyId: urlCompanyId || '',
             className={hasActiveFilters ? "border-orange-500 text-orange-600" : ""}
           >
             <Filter className="w-4 h-4 mr-2" />
-            Filters {hasActiveFilters && `(${Object.values(filters).filter(v => v).length})`}
+            {hasActiveFilters ? `Filters (${Object.values(filters).filter(v => v).length})` : "Filters"}
           </Button>
           <Can action="create_primary_lifting">
             <Button 
@@ -1069,7 +1093,7 @@ companyId: urlCompanyId || '',
               data-testid="add-primary-lifting-btn"
             >
               <Plus className="w-4 h-4 mr-2" />
-               ↓ STOCK IN
+              Stock IN
             </Button>
           </Can>
         </div>
@@ -1274,13 +1298,13 @@ companyId: urlCompanyId || '',
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Companies</SelectItem>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+{companies.map((c) => (
+                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+               </div>
+             </div>
           </CardContent>
         </Card>
       )}
@@ -1498,7 +1522,7 @@ companyId: urlCompanyId || '',
                             <div className="flex flex-col">
                               <span className="font-medium">{po.po_number}</span>
                               <span className="text-xs text-gray-500">
-                                {po.product_name} • {po.source_type === 'Company' ? po.source_company_name : po.depot_name}
+                                {po.product_name} • {po.depot_name}
                               </span>
                             </div>
                           </SelectItem>
@@ -1668,20 +1692,25 @@ companyId: urlCompanyId || '',
           {/* Helper Details */}
 
           {/* Unloading Point */}
-
           <div>
             <Label>Unloading Point *</Label>
-            <Select value={formData.unloading_point_id} onValueChange={handleUnloadingPointChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select destination" />
-              </SelectTrigger>
-              <SelectContent>
-                {formData.unloading_point_type === 'Depot' 
-                  ? depots.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))
-                  : companies.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))
-                }
-              </SelectContent>
-            </Select>
+            {formData.unloading_point_id ? (
+              <div className="text-sm font-medium text-gray-700 py-2 px-3 bg-gray-50 rounded-md">
+                {formData.unloading_point_name || formData.unloading_point_id}
+              </div>
+            ) : (
+              <Select value={formData.unloading_point_id} onValueChange={handleUnloadingPointChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select destination" />
+                </SelectTrigger>
+                <SelectContent>
+                  {formData.unloading_point_type === 'Depot' 
+                    ? depots.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))
+                    : companies.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))
+                  }
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Weights */}         

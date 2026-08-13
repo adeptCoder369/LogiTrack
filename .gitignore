@@ -49,6 +49,10 @@ dump.rdb
 .DS_Store
 *.pem
 
+# Allow SSL files
+!ssl-files/efba60b31e1377c9.pem
+!ssl-files/gd_bundle_dv-r1-g2.crt.pem
+
 # Python
 __pycache__/
 *pyc*
@@ -107,6 +111,4 @@ frontend/node_modules/.cache/default-development/11.pack
 *.env.*
 
 backend/env
-backend/.env
-frontend/env
 backend/uploads

@@ -69,7 +69,8 @@ export default function ProductAccess() {
     'Admin': 'bg-red-100 text-red-800',
     'Management': 'bg-slate-100 text-slate-800',
     'Loader': 'bg-blue-100 text-blue-800',
-    'Depot Manager': 'bg-green-100 text-green-800',
+    'Weightment': 'bg-green-100 text-green-800',
+    'Dispatch Verifier': 'bg-amber-100 text-amber-800',
     'Depot Staff': 'bg-purple-100 text-purple-800',
     'Depot Supervisor': 'bg-orange-100 text-orange-800',
   };

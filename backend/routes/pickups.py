@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 import uuid
 from pydantic import BaseModel
 
-from database import db
-from auth_utils import get_current_user, check_permission
-from models import Pickup, PickupCreate
+from .db_compat import db
+from auth_utils import get_current_user, check_permission, get_user_depot_ids, build_transporter_filter, ensure_transporter_access
+from models import Pickup, PickupCreate, Lifting
 
 # reuse inventory logic from liftings
-from routes.liftings import update_depot_inventory
+from routes.liftings import update_depot_inventory, update_company_inventory
 
 router = APIRouter(tags=["Pickups"])
 
@@ -56,6 +56,17 @@ async def create_pickup(
 
     company_id = current_user.get("company_id")
     pickup_data["company_id"] = company_id
+
+    if current_user.get("role") == "Transporter":
+        transporter_id = current_user.get("transporter_id")
+        if not transporter_id:
+            raise HTTPException(status_code=403, detail="Transporter access is not configured")
+
+        pickup_data["transporter_id"] = transporter_id
+        pickup_data["transporter_name"] = current_user.get("transporter_name") or data.transporter_name
+    else:
+        pickup_data["transporter_id"] = data.transporter_id
+        pickup_data["transporter_name"] = data.transporter_name
 
     # ====================================
     # 🚛 TRUCK AUTO-CREATION (IMPORTANT)
@@ -144,7 +155,8 @@ async def get_pickups(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     status: Optional[str] = None,
-    depot_id: Optional[str] = None,
+    source_id: Optional[str] = None,
+    source_type: Optional[str] = None,
     truck_number: Optional[str] = None,
     transporter_name: Optional[str] = None,
     driver_mobile: Optional[str] = None,
@@ -153,11 +165,24 @@ async def get_pickups(
     page_size: int = Query(100, ge=10, le=500),
     current_user: dict = Depends(get_current_user)
 ):
-    await check_permission(current_user, "Pickup (Execution)")
+    await check_permission(current_user, "Pickups (View)")
 
     query = {
         "company_id": current_user.get("company_id")
     }
+
+    if current_user.get("role") == "Transporter":
+        transporter_filter = build_transporter_filter(current_user, "transporter_id")
+        if transporter_filter:
+            query.update(transporter_filter)
+
+    # restrict to user's assigned depots (source_type = "Depot")
+    depot_ids = await get_user_depot_ids(current_user)
+    if depot_ids is not None:
+        query["$or"] = [
+            {"source_type": "Depot", "source_id": {"$in": depot_ids}},
+            {"source_type": {"$ne": "Depot"}}
+        ]
 
     # single date mode
     if date:
@@ -180,8 +205,11 @@ async def get_pickups(
         else:
             query["status"] = {"$in": statuses}
 
-    if depot_id:
-        query["depot_id"] = depot_id
+    if source_id:
+        query["source_id"] = source_id
+
+    if source_type:
+        query["source_type"] = source_type
 
     if truck_number:
         query["truck_number"] = {"$regex": truck_number, "$options": "i"}
@@ -350,12 +378,84 @@ async def upload_tare_slip(
     if pickup.get("status") in ["verified", "rescheduled", "rejected"]:
         raise HTTPException(400, "Cannot upload tare slip for this pickup")
 
+    now = datetime.now(timezone.utc).isoformat()
+    old_file = pickup.get("tare_slip_file_id")
+
+    update = {
+        "$set": {
+            "tare_slip_file_id": file_id
+        }
+    }
+
+    if old_file and old_file != file_id:
+        update["$push"] = {
+            "tare_slip_upload_history": {
+                "file_id": old_file,
+                "uploaded_by": current_user.get("id"),
+                "uploaded_by_name": current_user.get("name"),
+                "uploaded_at": now
+            }
+        }
+    
     await db.pickups.update_one(
         {"id": pickup_id},
-        {"$set": {"tare_slip_file_id": file_id}}
+        update
     )
 
     return {"message": "Tare slip uploaded successfully"}
+
+
+# ================================
+# WEIGHTMENT SLIP UPLOAD
+# ================================
+class WeightmentSlipUpload(BaseModel):
+    weightment_slip_file_id: str
+
+
+@router.put("/pickups/{pickup_id}/weightment-slip")
+async def upload_weightment_slip(
+    pickup_id: str,
+    payload: WeightmentSlipUpload,
+    current_user: dict = Depends(get_current_user)
+):
+    await check_permission(current_user, "Verify Pickup")
+
+    file_id = payload.weightment_slip_file_id
+    if not file_id:
+        raise HTTPException(400, "Weightment slip file is required")
+
+    pickup = await db.pickups.find_one({"id": pickup_id})
+    if not pickup:
+        raise HTTPException(404, "Pickup not found")
+
+    if pickup.get("status") in ["verified", "rescheduled", "rejected", "final_verified"]:
+        raise HTTPException(400, "Cannot upload weightment slip for this pickup")
+
+    now = datetime.now(timezone.utc).isoformat()
+    old_file = pickup.get("weightment_slip_file_id")
+
+    update = {
+        "$set": {
+            "weightment_slip_file_id": file_id
+        }
+    }
+
+    if old_file and old_file != file_id:
+        update["$push"] = {
+            "weightment_slip_upload_history": {
+                "file_id": old_file,
+                "uploaded_by": current_user.get("id"),
+                "uploaded_by_name": current_user.get("name"),
+                "uploaded_at": now
+            }
+        }
+    
+    await db.pickups.update_one(
+        {"id": pickup_id},
+         update
+    )
+
+    return {"message": "Weightment slip uploaded successfully"}
 
 
 # ================================
@@ -559,8 +659,8 @@ async def verify_pickup(
             "product_id": payload.get("product_id"),
             "product_name": payload.get("product_name"),
 
-            "depot_id": payload.get("depot_id"),
-            "depot_name": payload.get("depot_name"),
+            "source_id": payload.get("source_id"),
+            "source_name": payload.get("source_name"),
 
             "verified_by": current_user["id"],
             "verified_by_name": current_user["name"],
@@ -569,115 +669,48 @@ async def verify_pickup(
     )
 
     # ================================
-    # INVENTORY DEDUCTION
-    # ================================
-    if payload.get("depot_id") and payload.get("product_id"):
-
-        depot_id = payload.get("depot_id")
-        depot_name = payload.get("depot_name")
-
-        product_id = payload.get("product_id")
-        product_name = payload.get("product_name")
-
-        # fallback if depot name missing
-        if not depot_name:
-            depot = await db.depots.find_one({"id": depot_id})
-            depot_name = depot.get("name", "") if depot else ""
-
-        await update_depot_inventory(
-            depot_id=depot_id,
-            depot_name=depot_name,
-            product_id=product_id,
-            product_name=product_name,
-            product_code="",
-            quantity_change=weight,
-            is_incoming=False,
-            company_id=current_user.get("company_id")
-        )
-
-
-    # ================================
     # UPDATE PURCHASE ORDER
     # ================================
     # po already fetched for validation above, reuse it here
-    if po:
-        dispatched = float(po.get("dispatched_quantity_mt") or 0)
-        total = float(po.get("total_quantity_mt") or 0)
-
-        new_dispatched = dispatched + float(weight)
-        new_remaining = total - new_dispatched
-
-        # ====================================
-        # STATUS LOGIC
-        # ====================================
-        if po.get("status") == "Completed":
-
-            # preserve manual completion
-            new_status = "Completed"
-
-        elif new_dispatched <= 0:
-
-            # nothing dispatched yet
-            new_status = "Open"
-
-        else:
-
-            # dispatch started
-            new_status = "In Progress"
-
-        await db.purchase_orders.update_one(
-            {"id": purchase_order_id},
-            {
-                "$set": {
-                    "dispatched_quantity_mt": round(new_dispatched, 2),
-                    "remaining_quantity_mt": round(new_remaining, 2),
-                    "status": new_status
-                }
-            }
-        )
+#    if po:
+#        dispatched = float(po.get("dispatched_quantity_mt") or 0)
+#        total = float(po.get("total_quantity_mt") or 0)
+#
+#        new_dispatched = dispatched + float(weight)
+#        new_remaining = total - new_dispatched
+#
+#        # ====================================
+#        # STATUS LOGIC
+#        # ====================================
+#        if po.get("status") == "Completed":
+#
+#            # preserve manual completion
+#            new_status = "Completed"
+#
+#        elif new_dispatched <= 0:
+#
+#            # nothing dispatched yet
+#            new_status = "Open"
+#
+#        else:
+#
+#            # dispatch started
+#            new_status = "In Progress"
+#
+#        await db.purchase_orders.update_one(
+#            {"id": purchase_order_id},
+#            {
+#                "$set": {
+#                    "dispatched_quantity_mt": round(new_dispatched, 2),
+#                    "remaining_quantity_mt": round(new_remaining, 2),
+#                    "status": new_status
+#                }
+#            }
+#        )
 
     # ================================
-    # CREATE VERIFIED TRUCK ENTRY
+    # VERIFIED TRUCK ENTRY CREATION MOVED TO FINAL VERIFY
     # ================================
-    truck_no = pickup.get("truck_number") or pickup.get("vehicle_number") or ""
-    
-    if not truck_no:
-        raise HTTPException(400, "Truck number is missing from pickup record")
-    
-    verified_truck = {
-        "id": str(uuid.uuid4()),
-        "date": pickup.get("date"),
-        "truck_no": truck_no,
-        "transporter": pickup.get("transporter_name") or "",
-        "driver_mobile": pickup.get("driver_mobile") or "",
-        "company": payload.get("purchase_order_company_name") or "",
-        "product": payload.get("product_name") or "",
-        "product_id": payload.get("product_id") or "",
-        "po_number": po.get("client_po_number") or purchase_order_no or "",
-        "po_date": po.get("client_po_date") or po.get("po_date") if po else "",
-        "depot": payload.get("depot_name") or "",
-        "depot_id": payload.get("depot_id") or "",
-        "weight": weight,
-        "verified_by": current_user["name"],
-        "tare_slip_file_id": pickup.get("tare_slip_file_id") if pickup else None,
-        "weightment_slip_file_id": slips[0] if slips else None,
-        "invoice_details": None,
-        "invoice_added": False,
-        "shipping_details": None,
-        "shipping_added": False,
-        "pickup_id": pickup_id,
-        "created_at": now
-    }
-    print("-----verified_truck ==========:",verified_truck )  # Debug log
-    
-    await db.verified_trucks.insert_one(verified_truck)
-
-    # Verify it was saved correctly
-    saved = await db.verified_trucks.find_one({"id": verified_truck["id"]}, {"_id": 0})
-    print("-----  saved ==========:",saved )  # Debug log
-    if not saved or not saved.get("truck_no"):
-        print("ERROR: verified_truck saved without truck_no!", saved)
-
     return {"message": "Pickup verified successfully"}
 
 # ================================
@@ -714,7 +747,7 @@ async def reject_pickup(
         {"id": pickup_id},
         {"$set": {
             "status": "rejected",
-            "rejected_reason": reason.strip(),
+            "rejection_reason": reason.strip(),
             "rejected_at": datetime.now(timezone.utc).isoformat(),
             "rejected_by": current_user["id"],
             "rejected_by_name": current_user["name"]
@@ -727,7 +760,7 @@ async def reject_pickup(
 # GET SINGLE PICKUP
 # ================================
 @router.get("/pickups/{pickup_id}", response_model=Pickup)
-async def get_pickup(pickup_id: str):
+async def get_pickup(pickup_id: str, current_user: dict = Depends(get_current_user)):
     pickup = await db.pickups.find_one({"id": pickup_id}, {"_id": 0})
 
     if not pickup:
@@ -742,6 +775,7 @@ async def get_pickup(pickup_id: str):
 class WeightmentPayload(BaseModel):
     loaded_weight_mt: Optional[float] = None
     weightment_slip_file_id: Optional[str] = None
+    tare_slip_file_id: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -768,6 +802,9 @@ async def save_weightment(
     if payload.weightment_slip_file_id is not None:
         update["weightment_slip_file_id"] = payload.weightment_slip_file_id
 
+    if payload.tare_slip_file_id is not None:
+        update["tare_slip_file_id"] = payload.tare_slip_file_id
+
     if payload.status:
         update["status"] = payload.status
 
@@ -778,89 +815,6 @@ async def save_weightment(
         {"id": pickup_id},
         {"$set": update}
     )
-
-    # ================================
-    # CREATE VERIFIED TRUCK ENTRY (only on weightment_done)
-    # ================================
-    if update.get("status") == "weightment_done":
-        now = datetime.now(timezone.utc).isoformat()
-        weight = payload.loaded_weight_mt or pickup.get("loaded_weight_mt")
-
-        # Update pickup with verification timestamp
-        await db.pickups.update_one(
-            {"id": pickup_id},
-            {"$set": {
-                "verified_at": now,
-                "verified_by": current_user["id"],
-                "verified_by_name": current_user["name"],
-                "weight_mt": weight
-            }}
-        )
-
-        truck_no = pickup.get("truck_number") or pickup.get("vehicle_number") or ""
-
-        existing = await db.verified_trucks.find_one({"pickup_id": pickup_id})
-        if not existing:
-            verified_truck = {
-                "id": str(uuid.uuid4()),
-                "date": pickup.get("date"),
-                "truck_no": truck_no,
-                "transporter": pickup.get("transporter_name") or "",
-                "driver_mobile": pickup.get("driver_mobile") or "",
-                "company": pickup.get("purchase_order_company_name") or pickup.get("company_name") or "",
-                "product": pickup.get("product_name") or "",
-                "product_id": pickup.get("product_id") or "",
-                "po_number": pickup.get("purchase_order_no") or "",
-                "po_date": "",
-                "depot": pickup.get("depot_name") or "",
-                "depot_id": pickup.get("depot_id") or "",
-                "weight": weight,
-                "verified_by": current_user["name"],
-                "tare_slip_file_id": pickup.get("tare_slip_file_id"),
-                "weightment_slip_file_id": payload.weightment_slip_file_id,
-                "invoice_details": None,
-                "invoice_added": False,
-                "shipping_details": None,
-                "shipping_added": False,
-                "pickup_id": pickup_id,
-                "created_at": now
-            }
-            await db.verified_trucks.insert_one(verified_truck)
-        else:
-            await db.verified_trucks.update_one(
-                {"pickup_id": pickup_id},
-                {"$set": {
-                    "weight": weight,
-                    "weightment_slip_file_id": payload.weightment_slip_file_id,
-                    "tare_slip_file_id": pickup.get("tare_slip_file_id"),
-                    "transporter": pickup.get("transporter_name") or "",
-                    "company": pickup.get("purchase_order_company_name") or pickup.get("company_name") or "",
-                    "product": pickup.get("product_name") or "",
-                    "depot": pickup.get("depot_name") or "",
-                }}
-            )
-
-        # ================================
-        # DEDUCT FROM DEPOT INVENTORY
-        # ================================
-        depot_id = pickup.get("depot_id")
-        product_id = pickup.get("product_id")
-        if depot_id and product_id and weight:
-            depot_name = pickup.get("depot_name") or ""
-            product_name = pickup.get("product_name") or ""
-            if not depot_name:
-                depot = await db.depots.find_one({"id": depot_id})
-                depot_name = depot.get("name", "") if depot else ""
-            await update_depot_inventory(
-                depot_id=depot_id,
-                depot_name=depot_name,
-                product_id=product_id,
-                product_name=product_name,
-                product_code="",
-                quantity_change=float(weight),
-                is_incoming=False,
-                company_id=current_user.get("company_id")
-            )
 
     return {"message": "Weightment saved successfully"}
 
@@ -906,10 +860,14 @@ async def final_verify_pickup(
         po_update["product_id"] = payload["product_id"]
     if payload.get("product_name"):
         po_update["product_name"] = payload["product_name"]
-    if payload.get("depot_id"):
-        po_update["depot_id"] = payload["depot_id"]
-    if payload.get("depot_name"):
-        po_update["depot_name"] = payload["depot_name"]
+    if payload.get("source_id"):
+        po_update["source_id"] = payload["source_id"]
+    if payload.get("source_name"):
+        po_update["source_name"] = payload["source_name"]
+    if payload.get("tare_slip_file_id"):
+        po_update["tare_slip_file_id"] = payload["tare_slip_file_id"]
+    if payload.get("weightment_slip_file_id"):
+        po_update["weightment_slip_file_id"] = payload["weightment_slip_file_id"]
 
     await db.pickups.update_one(
         {"id": pickup_id},
@@ -917,20 +875,71 @@ async def final_verify_pickup(
     )
 
     # ================================
-    # UPDATE VERIFIED TRUCK ENTRY
+    # INVENTORY DEDUCTION
     # ================================
     loaded_weight = payload.get("loaded_weight_mt") or pickup.get("loaded_weight_mt")
+#    source_id = payload.get("source_id") or pickup.get("source_id")
+    source_id = pickup.get("source_id")
+    product_id = payload.get("product_id") or pickup.get("product_id")
+#    source_name = payload.get("source_name") or pickup.get("source_name") or ""
+    source_name = pickup.get("source_name")
+    product_name = payload.get("product_name") or pickup.get("product_name") or ""
+    
+    po_id = payload.get("purchase_order_id") or pickup.get("purchase_order_id")
+    po = None
+    if po_id:
+        po = await db.purchase_orders.find_one({"id": po_id})
+
+    if source_id and product_id and loaded_weight:
+        source_type = po.get("source_type", "Depot") if po else "Depot"
+        
+        if source_type == "Company":
+            await update_company_inventory(
+                company_id=source_id,
+                company_name=source_name,
+                product_id=product_id,
+                product_name=product_name,
+                product_code="",
+                quantity_change=float(loaded_weight),
+                is_incoming=False
+            )
+        else:
+            if not source_name:
+                depot = await db.depots.find_one({"id": source_id})
+                source_name = depot.get("name", "") if depot else ""
+
+            await update_depot_inventory(
+                depot_id=source_id,
+                depot_name=source_name,
+                product_id=product_id,
+                product_name=product_name,
+                product_code="",
+                quantity_change=float(loaded_weight),
+                is_incoming=False,
+                company_id=current_user.get("company_id")
+            )
+
+    # ================================
+    # UPDATE VERIFIED TRUCK ENTRY
+    # ================================
     verified_truck_update = {
         "company": payload.get("purchase_order_company_name") or pickup.get("purchase_order_company_name") or pickup.get("company_name") or "",
         "product": payload.get("product_name") or pickup.get("product_name") or "",
         "product_id": payload.get("product_id") or pickup.get("product_id") or "",
         "po_number": payload.get("po_number") or payload.get("purchase_order_no") or pickup.get("purchase_order_no") or "",
         "po_date": payload.get("po_date") or "",
-        "depot": payload.get("depot_name") or pickup.get("depot_name") or "",
-        "depot_id": payload.get("depot_id") or pickup.get("depot_id") or "",
+#        "source": payload.get("source_name") or pickup.get("source_name") or "",
+#        "source_id": payload.get("source_id") or pickup.get("source_id") or "",
+        "source": pickup.get("source_name") or "",
+        "source_id": pickup.get("source_id") or "",
         "weight": loaded_weight,
         "transporter": payload.get("transporter_name") or pickup.get("transporter_name") or "",
-        "verified_by": current_user["name"]
+        "verified_by": current_user["name"],
+        "final_verified_at": now,
+        "tare_slip_file_id": payload.get("tare_slip_file_id") or pickup.get("tare_slip_file_id"),
+        "weightment_slip_file_id": payload.get("weightment_slip_file_id") or pickup.get("weightment_slip_file_id"),
+        "tare_slip_upload_history": pickup.get("tare_slip_upload_history", []),
+        "weightment_slip_upload_history": pickup.get("weightment_slip_upload_history", []),
     }
 
     existing_vt = await db.verified_trucks.find_one({"pickup_id": pickup_id})
@@ -940,7 +949,6 @@ async def final_verify_pickup(
             {"$set": verified_truck_update}
         )
     else:
-        # create if missing (e.g. legacy data)
         truck_no = pickup.get("truck_number") or pickup.get("vehicle_number") or ""
         vt_entry = {
             "id": str(uuid.uuid4()),
@@ -953,12 +961,15 @@ async def final_verify_pickup(
             "product_id": verified_truck_update["product_id"],
             "po_number": verified_truck_update["po_number"],
             "po_date": verified_truck_update["po_date"],
-            "depot": verified_truck_update["depot"],
-            "depot_id": verified_truck_update["depot_id"],
+            "source": verified_truck_update["source"],
+            "source_id": verified_truck_update["source_id"],
             "weight": loaded_weight,
             "verified_by": current_user["name"],
-            "tare_slip_file_id": pickup.get("tare_slip_file_id"),
-            "weightment_slip_file_id": pickup.get("weightment_slip_file_id"),
+            "final_verified_at": now,
+            "tare_slip_file_id": payload.get("tare_slip_file_id") or pickup.get("tare_slip_file_id"),
+            "weightment_slip_file_id": payload.get("weightment_slip_file_id") or pickup.get("weightment_slip_file_id"),
+            "tare_slip_upload_history": pickup.get("tare_slip_upload_history", []),
+            "weightment_slip_upload_history": pickup.get("weightment_slip_upload_history", []),
             "invoice_details": None,
             "invoice_added": False,
             "shipping_details": None,
@@ -971,53 +982,135 @@ async def final_verify_pickup(
     # ================================
     # UPDATE PURCHASE ORDER DISPATCHED QTY
     # ================================
-    po_id = payload.get("purchase_order_id")
-    if po_id and loaded_weight:
-        po = await db.purchase_orders.find_one({"id": po_id})
-        if po:
-            dispatched = float(po.get("dispatched_quantity_mt") or 0)
-            total = float(po.get("total_quantity_mt") or 0)
-            new_dispatched = dispatched + float(loaded_weight)
-            new_remaining = total - new_dispatched
+    if po_id and loaded_weight and po:
+        dispatched = float(po.get("dispatched_quantity_mt") or 0)
+        total = float(po.get("total_quantity_mt") or 0)
+        new_dispatched = dispatched + float(loaded_weight)
+        new_remaining = total - new_dispatched
 
-            new_status = po.get("status")
-            if po.get("status") != "Completed":
-                if new_dispatched <= 0:
-                    new_status = "Open"
-                else:
-                    new_status = "In Progress"
+        new_status = po.get("status")
+        if po.get("status") != "Completed":
+            if new_dispatched <= 0:
+                new_status = "Open"
+            else:
+                new_status = "In Progress"
 
-            await db.purchase_orders.update_one(
-                {"id": po_id},
+        await db.purchase_orders.update_one(
+            {"id": po_id},
+            {
+                "$set": {
+                    "dispatched_quantity_mt": round(new_dispatched, 2),
+                    "remaining_quantity_mt": round(new_remaining, 2),
+                    "status": new_status
+                }
+            }
+        )
+    
+    # ================================
+    # CREATE SECONDARY LIFTING RECORD
+    # ================================
+    if po and loaded_weight:
+        # Check if a lifting already exists for this pickup
+        existing_lifting = await db.liftings.find_one({
+            "pickup_id": pickup_id
+        })
+        if existing_lifting:
+            # Lifting already exists, skip creation
+            pass
+        else:
+            source_type = po.get("source_type", "Depot")
+#            actual_source_id = payload.get("source_id") or pickup.get("source_id")
+#            actual_source_name = payload.get("source_name") or pickup.get("source_name") or ""
+            actual_source_id = pickup.get("source_id")
+            actual_source_name = pickup.get("source_name")
+            product_id = payload.get("product_id") or pickup.get("product_id")
+            product_name = payload.get("product_name") or pickup.get("product_name") or ""
+            
+            # Get PO details for unloading point
+            po_company_id = po.get("to_company_id")
+            po_company_name = po.get("to_company_name") or pickup.get("purchase_order_company_name") or ""
+            
+            if source_type != "Company" and not actual_source_name:
+                depot = await db.depots.find_one({"id": actual_source_id})
+                actual_source_name = depot.get("name", "") if depot else ""
+            
+            if po_company_id and not po_company_name:
+                company = await db.companies.find_one({"id": po_company_id})
+                po_company_name = company.get("name", "") if company else ""
+            
+            # Try to get driver name from truck's drivers list
+            driver_name = ""
+            if pickup.get("truck_id"):
+                truck = await db.trucks.find_one({"id": pickup["truck_id"]})
+                if truck and truck.get("drivers"):
+                    primary_driver = next((d for d in truck["drivers"] if d.get("is_primary")), None)
+                    driver_name = primary_driver.get("name", "") if primary_driver else ""
+            
+            # Generate lifting number
+            count = await db.liftings.count_documents({})
+            lifting_no = f"LFT-{str(count + 1).zfill(6)}"
+            
+            lifting = Lifting(
+                lifting_type="Secondary",
+                transport_mode="Road",
+                company_id=pickup.get("company_id") or current_user.get("company_id"),
+                product_id=product_id,
+                product_name=product_name,
+                product_code=po.get("product_code") or "",
+                quantity_mt=float(loaded_weight),
+                loading_point_type=source_type,
+                loading_point_id=actual_source_id,
+                loading_point_name=actual_source_name,
+                date_of_loading=pickup.get("date"),
+                time_of_loading=pickup.get("loading_start_time") or "",
+                vehicle_id=pickup.get("truck_id"),
+                vehicle_number=pickup.get("truck_number") or "",
+                transporter_name=pickup.get("transporter_name") or payload.get("transporter_name"),
+                driver_name=driver_name,
+                driver_mobile=pickup.get("driver_mobile") or "",
+                helper_name="",
+                helper_mobile="",
+                tare_weight_mt=None,
+                gross_weight_mt=None,
+                net_weight_mt=float(loaded_weight),
+                weight_slip=pickup.get("weightment_slip_file_id") or payload.get("weightment_slip_file_id") or "",
+                unloading_point_type="Company",
+                unloading_point_id=po_company_id,
+                unloading_point_name=po_company_name,
+                purchase_order_id=po.get("id"),
+                purchase_order_no=po.get("po_number") or "",
+                lifting_no=lifting_no,
+                loaded_by=current_user["id"],
+                loaded_by_name=current_user["name"],
+                unloading_status="Verified",
+                verified_by=current_user["id"],
+                verified_by_name=current_user["name"],
+                verified_at=now,
+                pickup_id=pickup_id,
+            )
+            await db.liftings.insert_one(lifting.model_dump())
+            await db.pickups.update_one(
+                {"id": pickup_id},
                 {
                     "$set": {
-                        "dispatched_quantity_mt": round(new_dispatched, 2),
-                        "remaining_quantity_mt": round(new_remaining, 2),
-                        "status": new_status
+                        "lifting_id": lifting.id,
+                        "lifting_no": lifting.lifting_no
                     }
                 }
             )
-
-    # ================================
-    # DEDUCT FROM DEPOT INVENTORY
-    # ================================
-    depot_id = payload.get("depot_id") or pickup.get("depot_id")
-    product_id = payload.get("product_id") or pickup.get("product_id")
-    if depot_id and product_id and loaded_weight:
-        depot_name = payload.get("depot_name") or pickup.get("depot_name") or ""
-        product_name = payload.get("product_name") or pickup.get("product_name") or ""
-        if not depot_name:
-            depot = await db.depots.find_one({"id": depot_id})
-            depot_name = depot.get("name", "") if depot else ""
-        await update_depot_inventory(
-            depot_id=depot_id,
-            depot_name=depot_name,
-            product_id=product_id,
-            product_name=product_name,
-            product_code="",
-            quantity_change=float(loaded_weight),
-            is_incoming=False,
-            company_id=current_user.get("company_id")
-        )
-
+            
+            # Update destination company's inventory (goods received)
+            if po_company_id:
+                company = await db.companies.find_one({"id": po_company_id})
+                if company:
+                    await update_company_inventory(
+                        company_id=po_company_id,
+                        company_name=company.get("name", ""),
+                        product_id=product_id,
+                        product_name=product_name,
+                        product_code=po.get("product_code") or "",
+                        quantity_change=float(loaded_weight),
+                        is_incoming=True
+                    )
+    
     return {"message": "Pickup final verified successfully"}

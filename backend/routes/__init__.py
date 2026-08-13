@@ -18,23 +18,10 @@ from .verified_trucks import router as verified_trucks_router
 from .company_inventory import router as company_inventory_router
 
 __all__ = [
-    'reports_router',
-    'companies_router',
-    'transporters_router',
-    'trucks_router',
-    'products_router',
-    'railway_sidings_router',
-    'railway_zones_router',
-    'depots_router',
-    'delivery_orders_router',
-    'liftings_router',
-    'permissions_router',
-    'product_access_router'
-    ,
-    'depot_access_router'
-    ,
-    'purchase_orders_router',
-    'pickups_router',
-    'verified_trucks_router',
-    'company_inventory_router'
+    'reports_router', 'companies_router', 'transporters_router',
+    'trucks_router', 'products_router', 'railway_sidings_router',
+    'railway_zones_router', 'depots_router', 'delivery_orders_router',
+    'liftings_router', 'permissions_router', 'product_access_router',
+    'depot_access_router', 'purchase_orders_router', 'pickups_router',
+    'verified_trucks_router', 'company_inventory_router',
 ]

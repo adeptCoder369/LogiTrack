@@ -63,10 +63,11 @@ export const PurchaseOrdersDataTable = ({
           {data.map((row, idx) => {
             const normalizedStatus = String(row?.status || '').trim().toLowerCase();
             const isCompletedRow = normalizedStatus === 'completed' && Number(row?.dispatched_quantity_mt || 0) >= Number(row?.total_quantity_mt || 0);
+            const isOpenRow = normalizedStatus === 'open';
             return (
               <TableRow 
                 key={row.id || idx} 
-                className={`${isCompletedRow ? 'bg-emerald-50' : 'hover:bg-gray-50'} transition-colors border-b border-gray-100`}
+                className={`${isCompletedRow ? 'bg-emerald-50' : isOpenRow ? 'bg-amber-50' : 'hover:bg-gray-50'} transition-colors border-b border-gray-100`}
                 data-testid={`table-row-${idx}`}
               >
                 {columns.map((col) => {

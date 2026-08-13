@@ -141,7 +141,9 @@ export default function UsersPage() {
     'Manager',
     'Driver',
     'Warehouse Staff',
-    'Depot Manager',
+    'Weightment',
+    'Dispatch Verifier',
+    'Transporter',
     'Loader',
     'Checker',
   ];

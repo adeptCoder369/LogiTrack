@@ -29,10 +29,10 @@ export default function Login() {
   const [activeView, setActiveView] = useState('main'); // main, loginOtp, forgotPassword, firstTimeSetup
 
   // Login states
-  const [loginData, setLoginData] = useState({ 
-    mobile: '', 
-    password: '', 
-    countryCode: '91' 
+  const [loginData, setLoginData] = useState({
+    mobile: '',
+    password: '',
+    countryCode: '91'
   });
 
   // OTP Login states
@@ -112,7 +112,7 @@ export default function Login() {
         country_code: loginData.countryCode,
         password: loginData.password
       });
-      
+
       // Check if this is a first-time login
       if (response.data.first_time_login) {
         toast.info(response.data.message);
@@ -164,7 +164,7 @@ export default function Login() {
         otp_code: firstTimeData.otp,
         new_password: firstTimeData.newPassword
       });
-      
+
       const { token, user } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -276,7 +276,7 @@ export default function Login() {
 
   const handleResendOtp = async (purpose) => {
     if (otpTimer > 0) return;
-    
+
     let mobile, countryCode;
     if (purpose === 'login') {
       mobile = otpLoginData.mobile;
@@ -324,16 +324,18 @@ export default function Login() {
 
   const renderHeader = () => (
     <div className="text-center mb-8">
-      <img 
-        src="https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png" 
-        alt="InfoEIGHT" 
+      <img
+        src="https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png"
+        alt="InfoEIGHT"
         className="h-16 mx-auto mb-4"
       />
-      <div className="inline-flex items-center justify-center w-14 h-14 bg-orange-500 rounded-2xl mb-3">
-        <Truck className="w-8 h-8 text-white" />
-      </div>
+      <img
+        src='icons/icon-512.webp'
+        alt='IBRMCO Logo'
+        className='h-16 mx-auto mb-4 rounded-full border-2 border-slate-700'
+      />
       <h1 className="text-3xl font-bold text-white" style={{ fontFamily: 'Manrope' }}>
-        LogiTrack Pro
+        IBRMCO   Pro
       </h1>
       <p className="text-slate-400 mt-1 text-sm">Powered by InfoEIGHT</p>
     </div>
@@ -450,8 +452,8 @@ export default function Login() {
               First time? Enter any password to receive OTP
             </p>
           </div>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full bg-slate-900 hover:bg-slate-800"
             disabled={loading}
             data-testid="login-submit"
@@ -459,7 +461,7 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
-        
+
         <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
           <button
             type="button"
@@ -495,7 +497,7 @@ export default function Login() {
         {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', step: 'mobile' }))}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Login with OTP</CardTitle>
         <CardDescription>
-          {otpLoginData.step === 'mobile' 
+          {otpLoginData.step === 'mobile'
             ? 'Enter your registered mobile number'
             : `Enter OTP sent to +${otpLoginData.countryCode}${otpLoginData.mobile}`}
         </CardDescription>
@@ -504,7 +506,7 @@ export default function Login() {
         {otpLoginData.step === 'mobile' ? (
           <>
             {renderMobileInput(otpLoginData, setOtpLoginData, 'otpLogin-')}
-            <Button 
+            <Button
               onClick={handleRequestLoginOtp}
               className="w-full bg-orange-500 hover:bg-orange-600"
               disabled={loading}
@@ -516,7 +518,7 @@ export default function Login() {
         ) : (
           <>
             {renderOtpInput(otpLoginData.otp, (val) => setOtpLoginData(prev => ({ ...prev, otp: val })), 'login')}
-            <Button 
+            <Button
               onClick={handleVerifyLoginOtp}
               className="w-full bg-orange-500 hover:bg-orange-600"
               disabled={loading}
@@ -546,7 +548,7 @@ export default function Login() {
         {forgotData.step === 'mobile' && (
           <>
             {renderMobileInput(forgotData, setForgotData, 'forgot-')}
-            <Button 
+            <Button
               onClick={handleForgotPasswordSendOtp}
               className="w-full bg-orange-500 hover:bg-orange-600"
               disabled={loading}
@@ -556,11 +558,11 @@ export default function Login() {
             </Button>
           </>
         )}
-        
+
         {forgotData.step === 'otp' && (
           <>
             {renderOtpInput(forgotData.otp, (val) => setForgotData(prev => ({ ...prev, otp: val })), 'reset_password')}
-            <Button 
+            <Button
               onClick={handleForgotPasswordVerifyOtp}
               className="w-full bg-orange-500 hover:bg-orange-600"
               disabled={loading}
@@ -570,7 +572,7 @@ export default function Login() {
             </Button>
           </>
         )}
-        
+
         {forgotData.step === 'password' && (
           <>
             <div className="space-y-2">
@@ -603,7 +605,7 @@ export default function Login() {
                 />
               </div>
             </div>
-            <Button 
+            <Button
               onClick={handleResetPassword}
               className="w-full bg-orange-500 hover:bg-orange-600"
               disabled={loading}
@@ -629,7 +631,7 @@ export default function Login() {
       </CardHeader>
       <CardContent className="space-y-4">
         {renderOtpInput(firstTimeData.otp, (val) => setFirstTimeData(prev => ({ ...prev, otp: val })), 'first_time_setup')}
-        
+
         <div className="space-y-2">
           <Label htmlFor="setup-password">Create Password</Label>
           <div className="relative">
@@ -645,7 +647,7 @@ export default function Login() {
             />
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="setup-confirm-password">Confirm Password</Label>
           <div className="relative">
@@ -661,8 +663,8 @@ export default function Login() {
             />
           </div>
         </div>
-        
-        <Button 
+
+        <Button
           onClick={handleFirstTimeSetup}
           className="w-full bg-orange-500 hover:bg-orange-600"
           disabled={loading}
@@ -670,7 +672,7 @@ export default function Login() {
         >
           {loading ? 'Setting up...' : 'Set Password & Login'}
         </Button>
-        
+
         <button
           type="button"
           onClick={() => {
@@ -689,14 +691,14 @@ export default function Login() {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {renderHeader()}
-        
+
         {activeView === 'main' && renderMainLogin()}
         {activeView === 'loginOtp' && renderLoginOtp()}
         {activeView === 'forgotPassword' && renderForgotPassword()}
         {activeView === 'firstTimeSetup' && renderFirstTimeSetup()}
 
         <p className="text-center text-slate-500 mt-6 text-sm">
-          LogiTrack Pro v2.1 | InfoEIGHT Solutions
+          IBRMCO  v2.1 | InfoEIGHT Solutions
         </p>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
-import { usersApi, depotsApi, adminApi, productsApi, productAccessApi, depotAccessApi, exportApi } from '../lib/api';
+import { usersApi, depotsApi, adminApi, productsApi, productAccessApi, depotAccessApi, exportApi, transportersApi } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { usePermissions } from '../lib/permissions';
 import { Can } from '../components/Can';
@@ -33,7 +33,9 @@ const roleDescriptions = {
   'Admin': 'Full system access - Manage all modules, users, and settings',
   'Management': 'Management level access with admin-like default permissions',
   'Loader': 'Create primary liftings from delivery orders, manage trucks',
-  'Depot Manager': 'Verify unloading at depot, create secondary liftings, view inventory',
+  'Weightment': 'Verify unloading at depot, create secondary liftings, view inventory',
+  'Dispatch Verifier': 'Finalize dispatch verification and confirm dispatch completion',
+  'Transporter': 'Access transporter-specific records and associated transporter users',
   'Depot Supervisor': 'Verify unloading at depot, create secondary liftings, view inventory, create schedule',
   'Depot Staff': 'Create secondary liftings from depot, view inventory',
 };
@@ -42,7 +44,9 @@ const roleColors = {
   'Admin': 'bg-red-100 text-red-800 border-red-200',
   'Management': 'bg-slate-100 text-slate-800 border-slate-300',
   'Loader': 'bg-blue-100 text-blue-800 border-blue-200',
-  'Depot Manager': 'bg-green-100 text-green-800 border-green-200',
+  'Weightment': 'bg-green-100 text-green-800 border-green-200',
+  'Dispatch Verifier': 'bg-amber-100 text-amber-800 border-amber-200',
+  'Transporter': 'bg-cyan-100 text-cyan-800 border-cyan-200',
   'Depot Supervisor': 'bg-orange-100 text-orange-800 border-orange-200',
   'Depot Staff': 'bg-purple-100 text-purple-800 border-purple-200'
 };
@@ -56,6 +60,7 @@ export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [depots, setDepots] = useState([]);
   const [products, setProducts] = useState([]);
+  const [transporters, setTransporters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -67,6 +72,7 @@ export default function UserManagement() {
     role: '',
     email: '',
     depot_id: '',
+    transporter_id: '',
     assigned_products: [],
     assigned_depots: [],
   });
@@ -77,14 +83,16 @@ export default function UserManagement() {
 
   const fetchData = async () => {
     try {
-      const [usersRes, depotsRes, productsRes] = await Promise.all([
+      const [usersRes, depotsRes, productsRes, transportersRes] = await Promise.all([
         usersApi.getAll(),
         depotsApi.getAll(),
-        productsApi.getAll()
+        productsApi.getAll(),
+        transportersApi.getAll()
       ]);
       setUsers(usersRes.data);
       setDepots(depotsRes.data);
       setProducts(productsRes.data);
+      setTransporters(transportersRes.data);
     } catch (error) {
       toast.error('Failed to load users');
     } finally {
@@ -101,6 +109,7 @@ export default function UserManagement() {
       role: '',
       email: '',
       depot_id: '',
+      transporter_id: '',
       assigned_products: [],
       assigned_depots: [],
     });
@@ -122,6 +131,7 @@ export default function UserManagement() {
       role: user.role || '',
       email: user.email || '',
       depot_id: user.depot_id || '',
+      transporter_id: user.transporter_id || '',
       assigned_products: user.assigned_products || [],
       assigned_depots: user.assigned_depots || [],
     });
@@ -168,6 +178,7 @@ export default function UserManagement() {
           role: formData.role,
           email: formData.email || null,
           depot_id: formData.depot_id || null,
+          transporter_id: formData.role === 'Transporter' ? (formData.transporter_id || null) : null,
         });
         // Update product access separately
         if (!editingUser.is_master_admin) {
@@ -184,6 +195,8 @@ export default function UserManagement() {
           role: formData.role,
           email: formData.email || null,
           depot_id: formData.depot_id || null,
+          transporter_id: formData.role === 'Transporter' ? (formData.transporter_id || null) : null,
+          company_id: formData.company_id || null,
           assigned_products: formData.assigned_products,
           assigned_depots: formData.assigned_depots,
         });
@@ -239,7 +252,7 @@ export default function UserManagement() {
     return acc;
   }, {});
 
-  const roles = ['Admin', 'Management', 'Loader', 'Depot Manager', 'Depot Supervisor', 'Depot Staff'];
+  const roles = ['Admin', 'Management', 'Loader', 'Weightment', 'Dispatch Verifier', 'Transporter', 'Depot Supervisor', 'Depot Staff'];
 
   const computeEffectiveDepotsForUser = (user) => {
     if (user?.is_master_admin) return depots.length; // all
@@ -355,6 +368,11 @@ export default function UserManagement() {
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{user.name}</p>
+                            {user.transporter_id && (
+                              <span className="font-bold text-blue-600">
+                               ( {user.transporter_name || transporters.find(t => t.id === user.transporter_id)?.name} )
+                              </span>
+                            )}
                             {user.is_master_admin && (
                               <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
                                 Master
@@ -493,7 +511,7 @@ export default function UserManagement() {
 
             <div>
               <Label>Role *</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+              <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v, transporter_id: '' })}>
                 <SelectTrigger data-testid="user-role">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -511,6 +529,29 @@ export default function UserManagement() {
               <p className="text-xs text-gray-500 mt-1">{roleDescriptions[formData.role] || 'Select a role to see permissions'}</p>
             </div>
 
+            {/* Transporter Selection - Only show for Transporter role */}
+            {formData.role === 'Transporter' && (
+              <div>
+                <Label>Select Transporter *</Label>
+                <Select value={formData.transporter_id} onValueChange={(v) => setFormData({ ...formData, transporter_id: v })}>
+                  <SelectTrigger data-testid="user-transporter">
+                    <SelectValue placeholder="Select a transporter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transporters.length === 0 ? (
+                      <div className="p-2 text-center text-gray-500 text-sm">No transporters available</div>
+                    ) : (
+                      transporters.map((transporter) => (
+                        <SelectItem key={transporter.id} value={transporter.id.toString()}>
+                          {transporter.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">This user will be mapped to the selected transporter</p>
+              </div>
+            )}
       
             <div>
               <Label>Email (Optional)</Label>

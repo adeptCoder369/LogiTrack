@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">IBRMCO</string>
     <string name="title_activity_main">IBRMCO</string>
-    <string name="package_name">com.infoeight.logitrack</string>
-    <string name="custom_url_scheme">com.infoeight.logitrack</string>
+    <string name="package_name">com.ibrmco.infoeight</string>
+    <string name="custom_url_scheme">com.ibrmco.infoeight</string>
 </resources>

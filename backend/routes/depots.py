@@ -1,13 +1,25 @@
 """Depot and Depot Inventory routes"""
 from fastapi import APIRouter, Depends
 from typing import List, Optional
-from datetime import datetime, timezone
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user, check_permission, get_user_depot_ids, build_product_filter, check_product_access, check_depot_access, build_depot_filter
-from models import Depot, DepotCreate, DepotInventory
+from models import Depot, DepotCreate
 
 router = APIRouter(tags=["Depots"])
+
+
+def resolve_txn_date(date_val, time_val, fallback=None):
+    """Build a valid ISO timestamp for ledger sorting/display.
+    time_of_loading sometimes stores a full ISO timestamp (contains 'T'),
+    so prefer it directly; otherwise combine the date part + time.
+    """
+    if time_val and isinstance(time_val, str) and "T" in time_val:
+        return time_val
+    if date_val and time_val:
+        return f"{str(date_val)[:10]}T{time_val}"
+    return date_val or time_val or fallback
+
 
 # ============ DEPOT ROUTES ============
 
@@ -113,7 +125,8 @@ async def get_inventory_ledger(
         "loading_point_id": depot_id,
         "product_id": product_id,
         "lifting_type": "Secondary",
-        "loading_status": "Loaded"
+        "loading_status": "Loaded",
+        "unloading_status": {"$ne": "Rejected"}
     }
     
     # Get all verified liftings that affect this depot/product
@@ -124,8 +137,10 @@ async def get_inventory_ledger(
     outgoing_liftings = await db.liftings.find(outgoing_query, {"_id": 0}).sort("date_of_loading", -1).to_list(1000)
 
     verified_pickups_query = {
-        "status": {"$in": ["verified", "weightment_done", "final_verified"]},
-        "depot_id": depot_id,
+        # Exclude final_verified pickups (they have corresponding liftings, avoid double-count)
+        "status": {"$in": ["verified", "weightment_done"]},
+        "source_id": depot_id,
+        "source_type": "Depot",
         "product_id": product_id
     }
 
@@ -136,11 +151,14 @@ async def get_inventory_ledger(
     
     # Create ledger entries
     all_transactions = []
-    running_balance = 0
     
     for lifting in incoming_liftings:
-        # Use verified_at (full timestamp) instead of date_of_unloading (date-only) to avoid timezone issues
-        txn_date = lifting.get("verified_at") or lifting.get("date_of_unloading")
+        # Use verified_at (full timestamp) when available, otherwise combine date + time
+        txn_date = lifting.get("verified_at") or resolve_txn_date(
+            lifting.get("date_of_unloading"),
+            lifting.get("time_of_unloading"),
+            lifting.get("created_at")
+        )
         all_transactions.append({
             "type": "IN",
             "date": txn_date,
@@ -154,12 +172,19 @@ async def get_inventory_ledger(
         })
     
     for lifting in outgoing_liftings:
-        txn_date = lifting.get("date_of_loading")
+        txn_date = resolve_txn_date(
+            lifting.get("date_of_loading"),
+            lifting.get("time_of_loading"),
+            lifting.get("created_at")
+        )
         all_transactions.append({
             "type": "OUT",
             "date": txn_date,
             "lifting_no": lifting.get("lifting_no"),
-            "quantity": lifting.get("quantity_mt", 0),
+            "quantity": (
+                lifting.get("net_weight_mt")
+                or lifting.get("quantity_mt", 0)
+            ),
             "to": lifting.get("unloading_point_name"),
             "vehicle": lifting.get("vehicle_number") or lifting.get("loading_siding_name"),
             "loaded_by": lifting.get("loaded_by_name"),
@@ -188,8 +213,24 @@ async def get_inventory_ledger(
         })
     
     # Sort by date (oldest first for balance calculation)
-    all_transactions.sort(key=lambda x: x.get("date") or "")
-    
+    # Use far-future fallback so None/empty dates sort to end (not beginning)
+    all_transactions.sort(key=lambda x: x.get("date") or "9999-99-99T99:99:99")
+
+    # Anchor the running balance to the actual stock on hand so each row
+    # shows the real remaining balance after that transaction (never a
+    # synthetic running total that can drift negative).
+    inventory = await db.depot_inventory.find_one({
+        "depot_id": depot_id,
+        "product_id": product_id
+    }, {"_id": 0})
+    actual_available = inventory.get("available_quantity", 0) if inventory else 0
+
+    net_change = sum(
+        t["quantity"] if t["type"] == "IN" else -t["quantity"]
+        for t in all_transactions
+    )
+    running_balance = round(actual_available - net_change, 2)
+
     # Calculate running balance
     for txn in all_transactions:
         if txn["type"] == "IN":
@@ -221,52 +262,11 @@ async def get_inventory_ledger(
         "transactions": all_transactions,
         "total_in": filtered_in,
         "total_out": filtered_out,
-        "current_balance": round(running_balance, 2),
+        "current_balance": round(actual_available, 2),
         "filtered_in": filtered_in if (date_from or date_to) else None,
         "filtered_out": filtered_out if (date_from or date_to) else None
     }
 
 
-# Helper function for updating depot inventory
-async def update_depot_inventory(depot_id: str, depot_name: str, product_id: str, product_name: str, 
-                                  product_code: str, quantity_change: float, is_incoming: bool):
-    existing = await db.depot_inventory.find_one({
-        "depot_id": depot_id,
-        "product_id": product_id
-    })
-    
-    if existing:
-        if is_incoming:
-            new_received = existing.get("total_received", 0) + quantity_change
-            new_available = existing.get("available_quantity", 0) + quantity_change
-            await db.depot_inventory.update_one(
-                {"id": existing["id"]},
-                {"$set": {
-                    "total_received": new_received,
-                    "available_quantity": new_available,
-                    "last_updated": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-        else:
-            new_dispatched = existing.get("total_dispatched", 0) + quantity_change
-            new_available = existing.get("available_quantity", 0) - quantity_change
-            await db.depot_inventory.update_one(
-                {"id": existing["id"]},
-                {"$set": {
-                    "total_dispatched": new_dispatched,
-                    "available_quantity": max(0, new_available),
-                    "last_updated": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-    else:
-        inventory = DepotInventory(
-            depot_id=depot_id,
-            depot_name=depot_name,
-            product_id=product_id,
-            product_name=product_name,
-            product_code=product_code or "",
-            total_received=quantity_change if is_incoming else 0,
-            total_dispatched=0 if is_incoming else quantity_change,
-            available_quantity=quantity_change if is_incoming else 0
-        )
-        await db.depot_inventory.insert_one(inventory.model_dump())
+# Depot inventory movements live in routes/liftings.py (update_depot_inventory).
+# An unused copy of that logic sat here and drifted out of sync with it.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
@@ -35,6 +36,7 @@ import VerifyPickup from "./pages/VerifyPickup";
 import FinalDispatchVerification from "./pages/FinalDispatchVerification";
 import RailwayZones from "./pages/RailwayZones";
 import VerifiedTruckDetailsPage from "./pages/VerifiedTruckDetails";
+import Downloads from "./pages/Downloads";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission }) => {
@@ -66,7 +68,9 @@ const AppLayout = ({ children }) => {
     <div className="main-layout">
       <Sidebar />
       <div className="content-area">
-        {children}
+        <div className="overflow-x-auto min-w-0 pt-4 lg:pt-0">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -104,7 +108,7 @@ function AppRoutes() {
       <Route path="/liftings" element={
         // <ProtectedRoute permission="Liftings (View)">
         // </ProtectedRoute>
-          <AppLayout><Liftings /></AppLayout>
+        <AppLayout><Liftings /></AppLayout>
       } />
 
       <Route path="/schedule-pickup" element={
@@ -236,6 +240,11 @@ function AppRoutes() {
       } />
 
 
+      <Route path="/downloads" element={
+        <ProtectedRoute permission="Downloads (View)">
+          <AppLayout><Downloads /></AppLayout>
+        </ProtectedRoute>
+      } />
 
 
       <Route path="/railway-zones" element={
@@ -307,18 +316,31 @@ const OfflineBanner = () => {
   );
 };
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      staleTime: 0,
+      retry: 1,
+    },
+  },
+});
+
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <AuthProvider>
-          <PermissionsProvider>
-            <AppRoutes />
-            <OfflineBanner />
-            <Toaster position="top-right" richColors />
-          </PermissionsProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <PermissionsProvider>
+              <AppRoutes />
+              <OfflineBanner />
+              <Toaster position="top-right" richColors />
+            </PermissionsProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
     </div>
   );
 }

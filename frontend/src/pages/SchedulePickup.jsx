@@ -15,20 +15,19 @@ import {
 
 import { pickupApi, trucksApi, transportersApi, companiesApi, depotsApi } from "../lib/api";
 import { usePermissions } from "../lib/permissions";
+import { useAuth } from "../lib/auth";
 import { toast } from "sonner";
 import { Plus, Trash2, Search, X, Calendar } from "lucide-react";
 import { ConfirmationDialogue } from "../components/ui/ConfirmationDialogue";
 
 export default function SchedulePickup() {
   const { hasPermission } = usePermissions();
+  const { user: currentUser } = useAuth();
   const canCreate = hasPermission("Schedule Pickup");
 
   const today = new Date().toISOString().split("T")[0];
 
   const [date, setDate] = useState(today);
-  const [rows, setRows] = useState([
-    createEmptyRow()
-  ]);
 
   const formatDateDDMMYYYY = (dateStr) => {
     const [year, month, day] = dateStr.split("-");
@@ -51,8 +50,11 @@ export default function SchedulePickup() {
   const [companies, setCompanies] = useState([]);
   const [depots, setDepots] = useState([]);
   const [selectedDepotFilter, setSelectedDepotFilter] = useState('');
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState('all');
   const [selectedDepotCreate, setSelectedDepotCreate] = useState('');
+  const [sourceType, setSourceType] = useState('Depot');
   const selectedDepotCreateName = depots.find((d) => d.id === selectedDepotCreate)?.name || '';
+  const selectedCompanyName = companies.find((c) => c.id === selectedDepotCreate)?.name || '';
   const [scheduledPickups, setScheduledPickups] = useState([]);
   const [dayCounts, setDayCounts] = useState({
     today: 0,
@@ -63,15 +65,34 @@ export default function SchedulePickup() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const mappedCompanyIds = currentUser?.role === "Transporter"
+    ? transporters.find((t) => t.id === currentUser?.transporter_id)?.company_ids || []
+    : [];
+
+  const mappedCompanies = currentUser?.role === "Transporter"
+    ? companies.filter((company) => mappedCompanyIds.includes(company.id))
+    : companies;
+  const getTransporterOptionLabel = (transporter) => {
+    if (currentUser?.role === "Transporter" && transporter?.id === currentUser?.transporter_id) {
+      return `Your Transporter: ${transporter?.name || ""}`.trim();
+    }
+
+    return transporter?.name || "-";
+  };
+
   const getDateString = (offset) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
     return d.toISOString().split("T")[0];
   };
-  console.log(scheduledPickups)
-  const filterByDepot = (items) => {
+  const filterBySourceId = (items) => {
     if (!selectedDepotFilter) return items;
-    return items.filter((item) => item.depot_id === selectedDepotFilter);
+    return items.filter((item) => item.source_id === selectedDepotFilter);
+  };
+
+  const filterBySourceType = (items) => {
+    if (selectedSourceFilter === "all" || !selectedSourceFilter) return items;
+    return items.filter((item) => item.source_type === selectedSourceFilter);
   };
 
   const fetchDayCounts = async () => {
@@ -83,9 +104,9 @@ export default function SchedulePickup() {
       ]);
 
       setDayCounts({
-        today: filterByDepot(todayRes.data || []).filter(p => p.status !== "rescheduled").length,
-        tomorrow: filterByDepot(tomorrowRes.data || []).filter(p => p.status !== "rescheduled").length,
-        dayAfter: filterByDepot(dayAfterRes.data || []).filter(p => p.status !== "rescheduled").length
+        today: filterBySourceType(filterBySourceId(todayRes.data || [])).filter(p => p.status !== "rescheduled").length,
+        tomorrow: filterBySourceType(filterBySourceId(tomorrowRes.data || [])).filter(p => p.status !== "rescheduled").length,
+        dayAfter: filterBySourceType(filterBySourceId(dayAfterRes.data || [])).filter(p => p.status !== "rescheduled").length
       });
     } catch {
       console.error("Failed to load pickup counts");
@@ -93,7 +114,7 @@ export default function SchedulePickup() {
   };
   useEffect(() => {
     fetchDayCounts();
-  }, []);
+  }, [selectedDepotFilter, selectedSourceFilter]);
 
   useEffect(() => {
     const urlDate = searchParams.get('date');
@@ -132,7 +153,7 @@ export default function SchedulePickup() {
   const fetchScheduledPickups = async () => {
     try {
       const res = await pickupApi.getByDate(date);
-      const data = filterByDepot(res.data || []);
+      const data = filterBySourceType(filterBySourceId(res.data || []));
       const statusPriority = { "scheduled": 1, "loaded": 2, "rescheduled": 3, "rejected": 4 };
       data.sort((a, b) => (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99));
       setScheduledPickups(data);
@@ -143,13 +164,18 @@ export default function SchedulePickup() {
 
   useEffect(() => {
     fetchScheduledPickups();
-  }, [date, selectedDepotFilter]);
+  }, [date, selectedDepotFilter, selectedSourceFilter]);
 
   useEffect(() => {
     fetchDayCounts();
   }, [selectedDepotFilter]);
 
   const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState([]);
+
+  useEffect(() => {
+    setRows([createEmptyRow()]);
+  }, [currentUser?.role, currentUser?.transporter_id, currentUser?.transporter_name]);
 
   const getStatusClasses = (status) => {
     switch (status) {
@@ -245,21 +271,27 @@ export default function SchedulePickup() {
     );
   };
 
-  function createEmptyRow() {
+  function createEmptyRow(sourceId = "", sourceName = "", sourceType = "Depot") {
     return {
       truck_id: "",
       truck_number: "",
       vehicleSearch: "",
       vehicleDropdownOpen: false,
 
-      transporter_id: "",
-      transporter_name: "",
+      transporter_id: currentUser?.role === "Transporter" ? currentUser?.transporter_id || "" : "",
+      transporter_name: currentUser?.role === "Transporter" ? currentUser?.transporter_name || "" : "",
 
-      company_id: "",
-      company_name: "",
+company_id: currentUser?.role === "Transporter" ? (mappedCompanyIds[0] || "") : "",
+  company_name: currentUser?.role === "Transporter"
+    ? companies.find((company) => company.id === mappedCompanyIds[0])?.name || ""
+    : "",
 
-      depot_id: "",
-      depot_name: "",
+      source_id: sourceId,
+      source_name: sourceName,
+      source_type: sourceType,
+
+      estimated_weight_mt: "",
+      driver_phone: "",
     };
   }
 
@@ -267,19 +299,51 @@ export default function SchedulePickup() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (currentUser?.role === "Transporter" && currentUser?.transporter_id) {
+      setRows((prevRows) => prevRows.map((row) => ({
+        ...row,
+        transporter_id: row.transporter_id || currentUser.transporter_id,
+        transporter_name: row.transporter_name || currentUser.transporter_name || "",
+        company_id: row.company_id || (mappedCompanyIds[0] || ""),
+        company_name: row.company_name || companies.find((company) => company.id === mappedCompanyIds[0])?.name || "",
+      })));
+    }
+  }, [currentUser?.role, currentUser?.transporter_id, currentUser?.transporter_name]);
+
   const handleFilterDepotChange = (depotId) => {
     setSelectedDepotFilter(depotId);
   };
 
-  const handleCreateDepotChange = (depotId) => {
-    const depot = depots.find((d) => d.id === depotId);
-    setSelectedDepotCreate(depotId);
+  const handleCreateDepotChange = (id) => {
+    setSelectedDepotCreate(id);
+    setRows((prevRows) => prevRows.map((row) => {
+      if (sourceType === "Depot") {
+        const depot = depots.find((d) => d.id === id);
+        return {
+          ...row,
+          source_id: id,
+          source_name: depot?.name || '',
+          source_type: "Depot"
+        };
+      } else {
+        const company = companies.find((c) => c.id === id);
+        return {
+          ...row,
+          source_id: id,
+          source_name: company?.name || '',
+          source_type: "Company"
+        };
+      }
+    }));
+  };
+
+  useEffect(() => {
     setRows((prevRows) => prevRows.map((row) => ({
       ...row,
-      depot_id: depotId,
-      depot_name: depot?.name || ''
+      source_type: sourceType
     })));
-  };
+  }, [sourceType]);
 
   const fetchData = async () => {
     const [truckRes, transporterRes, companyRes, depotRes] = await Promise.all([
@@ -293,6 +357,17 @@ export default function SchedulePickup() {
     setTransporters(transporterRes.data || []);
     setCompanies(companyRes.data || []);
     setDepots(depotRes.data || []);
+
+    if (currentUser?.role === "Transporter" && currentUser?.transporter_id) {
+      const transporterData = transporterRes.data?.find((t) => t.id === currentUser?.transporter_id);
+      if (transporterData?.company_ids?.length > 0) {
+        setRows((prevRows) => prevRows.map((row) => ({
+          ...row,
+          company_id: row.company_id || transporterData.company_ids[0],
+          company_name: row.company_name || (companyRes.data || []).find((company) => company.id === transporterData.company_ids[0])?.name || "",
+        })));
+      }
+    }
   };
 
   // =============================
@@ -344,6 +419,12 @@ export default function SchedulePickup() {
     const seen = new Set();
 
     for (let r of rows) {
+      if (!r.source_id || !r.source_name) {
+        toast.error(
+          `Source is missing for row ${index + 1}. Please select the source again.`
+        );
+        return false;
+      }
       if (!r.truck_number) {
         toast.error("Truck number is required");
         return false;
@@ -383,7 +464,21 @@ export default function SchedulePickup() {
   // ROW HANDLING
   // =============================
 
-  const addRow = () => setRows([...rows, createEmptyRow()]);
+  const addRow = () => {
+    const sourceName =
+      sourceType === "Depot"
+        ? depots.find(d => d.id === selectedDepotCreate)?.name || ""
+        : companies.find(c => c.id === selectedDepotCreate)?.name || "";
+
+    setRows(prev => [
+      ...prev,
+      createEmptyRow(
+        selectedDepotCreate,
+        sourceName,
+        sourceType
+      )
+    ]);
+  };
 
   const removeRow = (i) => {
     const updated = [...rows];
@@ -406,6 +501,7 @@ export default function SchedulePickup() {
     setConfirmOpen(true);
   };
 
+
   const handleConfirmSubmit = async () => {
     setConfirmLoading(true);
     setLoading(true);
@@ -419,15 +515,19 @@ export default function SchedulePickup() {
           transporter_name: r.transporter_name,
           company_id: r.company_id,
           company_name: r.company_name,
-          depot_id: r.depot_id,
-          depot_name: r.depot_name,
+          source_id: r.source_id,
+          source_name: r.source_name,
+          source_type: r.source_type,
           estimated_weight_mt: parseFloat(r.estimated_weight_mt || 0),
           driver_phone: r.driver_phone
         });
       }
 
       toast.success("Planned dispatch created successfully");
-      setRows([createEmptyRow()]);
+      const sourceName = sourceType === "Depot"
+        ? depots.find((d) => d.id === selectedDepotCreate)?.name || ''
+        : companies.find((c) => c.id === selectedDepotCreate)?.name || '';
+      setRows([createEmptyRow(selectedDepotCreate, sourceName, sourceType)]);
       setConfirmOpen(false);
       await Promise.all([
         fetchData(),
@@ -564,6 +664,32 @@ export default function SchedulePickup() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex flex-col gap-1.5 w-full sm:w-64">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Source Type Filter
+              </label>
+
+              <Select
+                value={selectedSourceFilter}
+                onValueChange={setSelectedSourceFilter}
+              >
+                <SelectTrigger className="h-10 text-sm font-medium text-slate-900 border-slate-200 focus:ring-slate-400 bg-white">
+                  <SelectValue placeholder="All Sources" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-sm font-medium text-slate-500">
+                    All Sources
+                  </SelectItem>
+                  <SelectItem value="Depot" className="text-sm">
+                    Depot
+                  </SelectItem>
+                  <SelectItem value="Company" className="text-sm">
+                    Company
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -573,35 +699,59 @@ export default function SchedulePickup() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-bold uppercase tracking-[0.2em] text-slate-700">Depot for Dispatch</span>
+              <span className="text-sm font-bold uppercase tracking-[0.2em] text-slate-700">Source Type</span>
+              <Select
+                value={sourceType}
+                onValueChange={setSourceType}
+              >
+                <SelectTrigger className="h-12 text-slate-900">
+                  <SelectValue placeholder="Select source type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Depot">Depot</SelectItem>
+                  <SelectItem value="Company">Company</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-bold uppercase tracking-[0.2em] text-slate-700">
+                {sourceType === "Depot" ? "Depot for Dispatch" : "Company for Dispatch"}
+              </span>
               <Select
                 value={selectedDepotCreate}
                 onValueChange={handleCreateDepotChange}
               >
                 <SelectTrigger className="h-12 text-slate-900">
-                  <SelectValue placeholder="Choose depot for new dispatch" />
+                  <SelectValue placeholder={`Choose ${sourceType.toLowerCase()} for new dispatch`} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL" className="text-sm font-medium text-slate-600 font-semibold">
-                    All Assigned Depots
+                    All Assigned {sourceType}s
                   </SelectItem>
 
-                  {depots.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
+                  {sourceType === "Depot"
+                    ? depots.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))
+                    : companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))
+                  }
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-500">This depot applies to planned dispatch rows and is separate from the filter above.</p>
+              <p className="text-xs text-slate-500">This {sourceType.toLowerCase()} applies to planned dispatch rows and is separate from the filter above.</p>
             </div>
           </div>
 
           {!selectedDepotCreate ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-700">
-              <p className="text-xl font-semibold text-slate-900">Plan dispatch for Depot:</p>
+              <p className="text-xl font-semibold text-slate-900">Plan dispatch for {sourceType === "Depot" ? "Depot" : "Company"}:</p>
               <p className="mt-3 text-sm text-slate-600 max-w-xl mx-auto">
-                Select a depot above to begin adding trucks and create planned dispatch entries for {formatDateForHeading(date)}.
+                Select a {sourceType === "Depot" ? "Depot" : "Company"} above to begin adding trucks and create planned dispatch entries for {formatDateForHeading(date)}.
               </p>
             </div>
           ) : (
@@ -675,20 +825,23 @@ export default function SchedulePickup() {
                         value={row.transporter_id}
                         onValueChange={(v) => {
                           const t = transporters.find(x => x.id === v);
+                          console.log('transporters===================>', transporters)
                           updateRow(i, "transporter_id", v);
                           updateRow(i, "transporter_name", t?.name || "");
                         }}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select transporter" />
+                          <SelectValue placeholder={currentUser?.role === "Transporter" ? "Your transporter" : "Select transporter"} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ALL" className="text-sm font-medium text-slate-500 italic">
-                            All Transporters
-                          </SelectItem>
-                          {transporters.map(t => (
+                          {currentUser?.role !== "Transporter" && (
+                            <SelectItem value="ALL" className="text-sm font-medium text-slate-500 italic">
+                              All Transporters
+                            </SelectItem>
+                          )}
+                          {transporters?.map(t => (
                             <SelectItem key={t.id} value={t.id}>
-                              {t.name}
+                              {getTransporterOptionLabel(t)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -713,19 +866,24 @@ export default function SchedulePickup() {
                         </SelectTrigger>
 
                         <SelectContent>
-                                 <SelectItem value="ALL" className="text-sm font-medium text-slate-500 italic">
-                            All Companies
-                          </SelectItem>
-                          {companies.map(c => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
+                          {currentUser?.role !== "Transporter" && (
+                            <SelectItem value="ALL" className="text-sm font-medium text-slate-500 italic">
+                              All Companies
                             </SelectItem>
-                          ))}
+                          )}
+                          {currentUser?.role === "Transporter" && mappedCompanies.length === 0 ? (
+                            <div className="p-2 text-xs text-slate-500 text-center">No company has been assigned</div>
+                          ) : (
+                            mappedCompanies?.map(c => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* ⚖️ ESTIMATED WEIGHT */}
                     <div>
                       <Label>Estimated Weight (MT)</Label>
 
@@ -849,6 +1007,14 @@ export default function SchedulePickup() {
                       {p.company_name || "-"} • Est:{" "}
                       {Number(p.estimated_weight_mt || 0).toFixed(2)} MT
                     </div>
+
+                    <div className="text-xs text-slate-600 mt-1 font-medium">
+                      Source: {p.source_type || "-"}
+                    </div>
+
+                    <div className="text-xs text-slate-500 mt-1">
+                      From: {p.source_name || "-"}
+                    </div>
                   </div>
 
                   {renderStatusDetails(p)}
@@ -879,7 +1045,10 @@ export default function SchedulePickup() {
           <p className="font-semibold text-slate-900">Review details</p>
           <div className="mt-2 space-y-1">
             <p>
-              <span className="font-medium">Depot:</span> {selectedDepotCreateName || "None"}
+              <span className="font-medium">Source:</span> {sourceType}
+            </p>
+            <p>
+              <span className="font-medium">Selected:</span> {sourceType === "Depot" ? selectedDepotCreateName : selectedCompanyName || "None"}
             </p>
             <p>
               <span className="font-medium">Date:</span> {formatDateDDMMYYYY(date)}

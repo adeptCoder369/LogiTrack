@@ -1,14 +1,14 @@
 """Permissions routes"""
 from fastapi import APIRouter, HTTPException, Depends
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user
-from config import PERMISSION_DEFAULTS
+from config import PERMISSION_DEFAULTS, normalize_permission_map
 
 router = APIRouter(tags=["Permissions"])
 
 @router.get("/permissions")
-async def get_permissions_api():
+async def get_permissions_api(current_user: dict = Depends(get_current_user)):
     """Get all role permissions"""
     permissions = await db.permissions.find_one({"id": "role_permissions"}, {"_id": 0})
     if not permissions or not permissions.get("permissions"):
@@ -17,7 +17,7 @@ async def get_permissions_api():
     
     # Merge with defaults to ensure all modules are present
     stored_permissions = permissions.get("permissions", {})
-    merged_permissions = {**PERMISSION_DEFAULTS, **stored_permissions}
+    merged_permissions = {**PERMISSION_DEFAULTS, **normalize_permission_map(stored_permissions)}
     return {"id": "role_permissions", "permissions": merged_permissions}
 
 @router.put("/permissions")
@@ -54,11 +54,11 @@ async def toggle_permission(module: str, role: str, current_user: dict = Depends
         permissions = PERMISSION_DEFAULTS.copy()
     else:
         # Merge with defaults to ensure all modules are present
-        permissions = {**PERMISSION_DEFAULTS, **perm_doc.get("permissions", {})}
+        permissions = {**PERMISSION_DEFAULTS, **normalize_permission_map(perm_doc.get("permissions", {}))}
     
     # Ensure the module exists with proper defaults
     if module not in permissions:
-        permissions[module] = {"Management": True, "Admin": True, "Loader": False, "Depot Manager": False, "Depot Staff": False}
+        permissions[module] = {"Management": True, "Admin": True, "Loader": False, "Weightment": False, "Dispatch Verifier": False, "Transporter": False, "Depot Staff": False}
     
     current_value = permissions[module].get(role, False)
     permissions[module][role] = not current_value

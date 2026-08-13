@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -8,6 +9,7 @@ import PickupStatsCards from '../components/pickup/StatsCards';
 import PickupFilterPanel from '../components/pickup/FilterPanel';
 import { pickupApi, uploadFile, getFileUrl, depotsApi, transportersApi, companiesApi } from '../lib/api';
 import { usePermissions } from '../lib/permissions';
+import { useAuth } from '../lib/auth';
 import { toast } from 'sonner';
 import { Calendar, Truck, Clock, RotateCcw, Eye } from 'lucide-react';
 import {
@@ -17,10 +19,17 @@ import {
   DialogTitle,
   DialogFooter
 } from "../components/ui/dialog";
-import { PickupDataTable } from '@/components/pickup/DataTable';
+import { PickupDataTable } from '@/components/pickup/DataTablePickup';
 import SlideToConfirm from '../components/shared/SlideToConfirm';
 
 const columns = [
+  {
+    key: 'source',
+    label: 'Source',
+    render: (v, row) => {
+      return <span className="text-sm">{row.source_name || row.depot_name || "-"}</span>;
+    }
+  },
   {
     key: 'truck_number',
     label: 'Truck',
@@ -163,6 +172,8 @@ const columns = [
         scheduled: 'bg-slate-100 text-slate-700 border-l-4 border-slate-400',
         loading_started: 'bg-amber-100 text-amber-800 border-l-4 border-amber-500',
         loaded: 'bg-emerald-100 text-emerald-800 border-l-4 border-emerald-500',
+        weightment_done: 'bg-purple-100 text-purple-800 border-l-4 border-purple-500',
+        final_verified: 'bg-blue-100 text-blue-800 border-l-4 border-blue-500',
         rescheduled: 'bg-orange-100 text-orange-800 border-l-4 border-orange-500',
         rejected: 'bg-red-100 text-red-800 border-l-4 border-red-500',
         verified: 'bg-blue-100 text-blue-800 border-l-4 border-blue-500'
@@ -363,6 +374,7 @@ const formatElapsedTime = (start) => {
 
 export default function Pickup() {
   const { hasPermission, hasActionPermission } = usePermissions();
+  const { user } = useAuth();
   const canView = hasPermission('Pickup (Execution)');
   const canExecute = hasActionPermission('execute_pickup');
 
@@ -390,19 +402,18 @@ export default function Pickup() {
 
   const [filters, setFilters] = useState({
     status: '',
-    depot_id: '',
+    source_id: '',
+    source_type: '',
     start_date: '',
     end_date: '',
     truck_number: '',
     transporter_name: '',
-    driver_phone: '',
-    company_name: ''
+    driver_phone: ''
   });
-  const [data, setData] = useState([]);
+  const queryClient = useQueryClient();
   const [depots, setDepots] = useState([]);
   const [transporters, setTransporters] = useState([]);
   const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
@@ -415,7 +426,59 @@ export default function Pickup() {
   const [loadedConfirmRow, setLoadedConfirmRow] = useState(null);
   const [uploadingTare, setUploadingTare] = useState({});
   const [startLoading, setStartLoading] = useState({});
+  const [tareSlipFilesLocal, setTareSlipFilesLocal] = useState({});
+  const [savingTare, setSavingTare] = useState({});
+  const [tareConfirmOpen, setTareConfirmOpen] = useState(false);
+  const [tareConfirmRow, setTareConfirmRow] = useState(null);
   const [, setTick] = useState(0);
+
+  const buildPickupParams = useCallback(() => {
+    const isDateRange = filters.start_date || filters.end_date;
+
+    const params = {
+      source_id: filters.source_id || undefined,
+      source_type: filters.source_type || undefined,
+      truck_number: filters.truck_number || undefined,
+      transporter_name: filters.transporter_name || undefined,
+      driver_mobile: filters.driver_phone || undefined
+    };
+
+    if (isDateRange) {
+      params.start_date = filters.start_date || undefined;
+      params.end_date = filters.end_date || undefined;
+    } else {
+      const selectedTab = tabs.find(t => t.key === activeTab);
+      params.date = selectedTab?.date;
+    }
+
+    return params;
+  }, [activeTab, tabs, filters.start_date, filters.end_date, filters.source_id, filters.source_type, filters.truck_number, filters.transporter_name, filters.driver_phone]);
+
+  const pickupParams = useMemo(() => buildPickupParams(), [buildPickupParams]);
+
+  const { data: allData = [], isLoading, refetch } = useQuery({
+    queryKey: ['pickups', pickupParams],
+    queryFn: async () => {
+      const res = await pickupApi.getAll(pickupParams);
+      const rows = (res.data || []).slice();
+      const statusPriority = { "loading_started": 1, "scheduled": 2, "loaded": 3, "weightment_done": 4, "verified": 5, "final_verified": 5, "rescheduled": 6 };
+      rows.sort((a, b) => (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99));
+      return rows;
+    },
+    enabled: canView,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+
+  const statusFilter = filters.status || '';
+  const data = useMemo(() => {
+    if (!statusFilter) return allData;
+
+    return statusFilter === 'verified'
+      ? allData.filter(row => row.status === 'verified' || row.status === 'final_verified')
+      : allData.filter(row => row.status === statusFilter);
+  }, [allData, statusFilter]);
 
   const openReject = (row) => {
     setSelectedRow(row);
@@ -439,48 +502,11 @@ export default function Pickup() {
 
       toast.success("Pickup rejected successfully");
       setRejectOpen(false);
-      fetchData();
+      await queryClient.invalidateQueries({ queryKey: ['pickups'] });
     } catch (err) {
       toast.error(
         err?.response?.data?.detail || "Reject failed"
       );
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      const isDateRange =
-        filters.start_date || filters.end_date;
-
-      const params = {
-        status: filters.status || undefined,
-        depot_id: filters.depot_id || undefined,
-        truck_number: filters.truck_number || undefined,
-        transporter_name: filters.transporter_name || undefined,
-        driver_mobile: filters.driver_phone || undefined,
-        company_name: filters.company_name || undefined
-      };
-
-      if (isDateRange) {
-        params.start_date = filters.start_date || undefined;
-        params.end_date = filters.end_date || undefined;
-      } else {
-        const selectedTab = tabs.find(t => t.key === activeTab);
-        params.date = selectedTab.date;
-      }
-
-      const res = await pickupApi.getAll(params);
-      const rows = (res.data || []).slice();
-      const statusPriority = { "scheduled": 1, "loading_started": 2, "loaded": 3, "verified": 4, "rescheduled": 5 };
-      rows.sort((a, b) => (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99));
-
-      setData(rows);
-    } catch (err) {
-      toast.error('Failed to load pickup data');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -499,9 +525,9 @@ export default function Pickup() {
         console.error('Failed to load filter data:', err);
       }
     };
+
     loadDepots();
-    fetchData();
-  }, [activeTab, filters]);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -524,7 +550,7 @@ export default function Pickup() {
       }
 
       await pickupApi.updateStatus(id, { status });
-      fetchData();
+      await queryClient.invalidateQueries({ queryKey: ['pickups'] });
     } catch {
       toast.error('Failed to update status');
     } finally {
@@ -566,7 +592,7 @@ export default function Pickup() {
 
       toast.success("Rescheduled successfully");
       setRescheduleOpen(false);
-      fetchData();
+      await queryClient.invalidateQueries({ queryKey: ['pickups'] });
     } catch {
       toast.error("Reschedule failed");
     }
@@ -584,11 +610,9 @@ export default function Pickup() {
 
     try {
       const result = await uploadFile(file);
-      await pickupApi.uploadTareSlip(pickupId, {
-        tare_slip_file_id: result.file_id
-      });
-      toast.success("Tare slip uploaded successfully");
-      fetchData();
+      setTareSlipFilesLocal((prev) => ({ ...prev, [pickupId]: result.file_id }));
+      setTareConfirmRow({ id: pickupId, fileId: result.file_id });
+      setTareConfirmOpen(true);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to upload tare slip");
     } finally {
@@ -600,12 +624,13 @@ export default function Pickup() {
   const customActions = (row) => {
     console.log('  row.status-------', row);
     const isTodayTab = activeTab === 'today' && !isDateRangeMode;
+    const isManagement = user?.role === 'Management';
 
     return (
       <div className="flex gap-2 flex-nowrap">
 
-        {/* START LOADING ONLY FOR TODAY */}
-        {row.status === 'scheduled' && isTodayTab && (
+        {/* START LOADING ONLY FOR TODAY OR MANAGEMENT ROLE */}
+        {row.status === 'scheduled' && (isTodayTab || isManagement) && (
           <Button
             size="sm"
             disabled={startLoading[row.id]}
@@ -665,28 +690,48 @@ export default function Pickup() {
 
         {(row.status === 'loading_started' || row.status === 'loaded' || row.status === 'scheduled') && (
           <div className="flex items-center gap-2">
-            {row.tare_slip_file_id ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.open(getFileUrl(row.tare_slip_file_id), '_blank')}
-              >
-                <Eye className="w-4 h-4 mr-1" />
-                View Tare Slip
-              </Button>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              capture="environment"
+              className="hidden"
+              id={`tare-slip-upload-${row.id}`}
+              onChange={(e) => handleUploadTareSlip(row.id, e.target.files?.[0], e.target)}
+            />
+
+            {(tareSlipFilesLocal[row.id] || row.tare_slip_file_id) ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(getFileUrl(tareSlipFilesLocal[row.id] || row.tare_slip_file_id), '_blank')}
+                >
+                  <Eye className="w-4 h-4 mr-1" />
+                  View Tare Slip
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const inputEl = document.getElementById(`tare-slip-upload-${row.id}`);
+                    if (inputEl) inputEl.click();
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={savingTare[row.id]}
+                  onClick={() => {
+                    setTareConfirmRow({ id: row.id, fileId: tareSlipFilesLocal[row.id] || row.tare_slip_file_id });
+                    setTareConfirmOpen(true);
+                  }}
+                >
+                  {savingTare[row.id] ? 'Saving...' : 'Save'}
+                </Button>
+              </>
             ) : (
               <>
-                {/* Hidden input field */}
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  capture="environment"
-                  className="hidden"
-                  id={`tare-slip-upload-${row.id}`}
-                  onChange={(e) => handleUploadTareSlip(row.id, e.target.files?.[0], e.target)}
-                />
-
-                {/* Trigger button using native DOM selection via ID instead of label wrapper */}
                 <Button
                   size="sm"
                   variant="outline"
@@ -708,18 +753,19 @@ export default function Pickup() {
 
   // 📊 Stats (same pattern as Liftings)
   const stats = {
-    total: data.length,
-    scheduled: data.filter(d => d.status === 'scheduled').length,
-    loading: data.filter(d => d.status === 'loading_started').length,
-    loaded: data.filter(d => d.status === 'loaded').length,
-    verified: data.filter(d => d.status === 'verified').length,
-    rescheduled: data.filter(d => d.status === 'rescheduled').length
+    total: allData.length,
+    scheduled: allData.filter(d => d.status === 'scheduled').length,
+    loading: allData.filter(d => d.status === 'loading_started').length,
+    loaded: allData.filter(d => d.status === 'loaded').length,
+    weightment_done: allData.filter(d => d.status === 'weightment_done').length,
+    verified: allData.filter(d => d.status === 'verified' || d.status === 'final_verified').length,
+    rescheduled: allData.filter(d => d.status === 'rescheduled').length
   };
 
   const filteredData = React.useMemo(() => {
     let result = data;
-    if (filters.depot_id) {
-      result = result.filter(item => item.depot_id === filters.depot_id);
+    if (filters.source_id) {
+      result = result.filter(item => item.source_id === filters.source_id);
     }
     if (filters.truck_number) {
       const val = filters.truck_number.toLowerCase();
@@ -731,10 +777,6 @@ export default function Pickup() {
     }
     if (filters.driver_phone) {
       result = result.filter(item => item.driver_phone?.includes(filters.driver_phone));
-    }
-    if (filters.company_name) {
-      const val = filters.company_name.toLowerCase();
-      result = result.filter(item => item.company_name?.toLowerCase().includes(val));
     }
     return result;
   }, [data, filters]);
@@ -853,7 +895,7 @@ export default function Pickup() {
       <PickupDataTable
         columns={columns}
         data={filteredData}
-        loading={loading}
+        loading={isLoading}
         customActions={customActions}
         emptyMessage="No pickups scheduled for this date"
       />
@@ -1000,6 +1042,55 @@ export default function Pickup() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={tareConfirmOpen} onOpenChange={setTareConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Confirm Tare Slip Save</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              <p>Are you sure? As after saving you will not get an edit option anymore.</p>
+            </div>
+            <div className="flex justify-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTareConfirmOpen(false);
+                  setTareConfirmRow(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={savingTare[tareConfirmRow?.id]}
+                onClick={async () => {
+                  if (!tareConfirmRow) return;
+                  setSavingTare((prev) => ({ ...prev, [tareConfirmRow.id]: true }));
+                  try {
+                    await pickupApi.uploadTareSlip(tareConfirmRow.id, {
+                      tare_slip_file_id: tareConfirmRow.fileId
+                    });
+                    toast.success("Tare slip saved successfully");
+                    setTareSlipFilesLocal((prev) => { const n = { ...prev }; delete n[tareConfirmRow.id]; return n; });
+                    await queryClient.invalidateQueries({ queryKey: ['pickups'] });
+                  } catch (err) {
+                    toast.error(err?.response?.data?.detail || "Failed to save tare slip");
+                  } finally {
+                    setSavingTare((prev) => { const n = { ...prev }; delete n[tareConfirmRow.id]; return n; });
+                    setTareConfirmOpen(false);
+                    setTareConfirmRow(null);
+                  }
+                }}
+              >
+                {savingTare[tareConfirmRow?.id] ? 'Saving...' : 'Yes, Save Tare Slip'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </PageLayout>
   );
 }

@@ -210,7 +210,7 @@ export default function Depots() {
 
   const { hasActionPermission } = usePermissions();
   const warehouseTypes = ['General', 'Cold Storage', 'Open Yard', 'Covered', 'Bonded'];
-  const roles = ['Admin', 'Management', 'Loader', 'Depot Manager', 'Depot Supervisor', 'Depot Staff'];
+  const roles = ['Admin', 'Management', 'Loader', 'Weightment', 'Dispatch Verifier', 'Depot Supervisor', 'Depot Staff'];
 
   return (
     <PageLayout

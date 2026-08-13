@@ -6,11 +6,18 @@ import { Card, CardContent } from '../ui/card';
 export const POStatementModal = ({
   statementOpen,
   statementData,
+  estimateInfo,
   handleDownloadExcel,
   handleDownloadPDF,
   setStatementOpen,
 }) => {
+  const dispatchTransactions = (statementData?.transactions || []).filter((txn) => {
+    const normalizedType = String(txn?.type || '').trim().toLowerCase();
+    return normalizedType === 'dispatch' || normalizedType === 'pickup';
+  });
 
+
+  console.log('dispatchTransactions',dispatchTransactions)
   return (
     <>
       {statementOpen && statementData && (
@@ -145,7 +152,7 @@ export const POStatementModal = ({
               <Card>
                 <CardContent className="pt-5">
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-5 text-sm">
 
                     <div>
                       <p className="text-gray-500 text-xs mb-1">
@@ -189,6 +196,26 @@ export const POStatementModal = ({
                             ? new Date(statementData.purchase_order.po_date).toLocaleDateString("en-IN")
                             : "-"}
                       </p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-500 text-xs mb-1">
+                        Estimated Completion
+                      </p>
+                      {estimateInfo ? (
+                        <div className="text-sm text-slate-800">
+                          <div className="font-medium">
+                            <span className="font-bold text-gray-700">{estimateInfo.x}/{estimateInfo.y}</span>
+                            <span className="text-gray-400 mx-1">•</span>
+                            <span className={estimateInfo.trackingColorClass}>{estimateInfo.trackingText}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {estimateInfo.estCompDateStr}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="font-medium text-slate-800">-</p>
+                      )}
                     </div>
 
                   </div>
@@ -258,9 +285,9 @@ export const POStatementModal = ({
 
                       <tbody>
 
-                        {statementData.transactions?.length ? (
+                        {dispatchTransactions.length ? (
 
-                          statementData.transactions.map((txn, idx) => (
+                          dispatchTransactions.map((txn, idx) => (
 
                             <tr
                               key={idx}
@@ -287,12 +314,9 @@ export const POStatementModal = ({
                               <td className="px-4 py-3">
 
                                 <span
-                                  className={`px-2 py-1 rounded text-xs font-medium ${txn.type === "Pickup"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-purple-100 text-purple-700"
-                                    }`}
+                                  className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700"
                                 >
-                                  {txn.type === 'Pickup' ? 'Dispatch' : 'Pickup'}
+                                  Dispatch
                                 </span>
 
                               </td>

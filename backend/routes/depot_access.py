@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from pydantic import BaseModel
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user, get_user_depot_ids
 
 router = APIRouter(tags=["Depot Access"])
@@ -191,6 +191,10 @@ async def revoke_depot_access_from_users(depot_id: str, data: BulkDepotAccessReq
     admin_depot_ids = await get_user_depot_ids(current_user)
     if admin_depot_ids is not None and depot_id not in admin_depot_ids:
         raise HTTPException(status_code=403, detail="You don't have access to manage this depot")
+
+    depot = await db.depots.find_one({"id": depot_id})
+    if not depot:
+        raise HTTPException(status_code=404, detail="Depot not found")
 
     updated = 0
     for user_id in data.user_ids:

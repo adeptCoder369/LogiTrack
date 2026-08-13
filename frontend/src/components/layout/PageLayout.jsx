@@ -3,13 +3,13 @@ import { Header } from './Header';
 export const PageLayout = ({ title, subtitle, children, actions }) => {
   return (
     <div className="min-h-screen">
-      <Header title={title} subtitle={subtitle} />
       
-      <main className="p-6 lg:p-8">
+      <Header title={title} subtitle={subtitle} />
+      <main className="p-4 lg:p-6 lg:p-8 mt-12 overflow-x-auto min-w-0">
         {actions && (
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
             <div />
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {actions}
             </div>
           </div>

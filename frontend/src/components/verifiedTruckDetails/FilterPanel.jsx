@@ -22,7 +22,7 @@ export default function VerifiedTruckDetailsFilterPanel({ filters, setFilters, s
     const to = new Date();
     const from = new Date();
     from.setMonth(from.getMonth() - 2);
-    const fmt = (d) => d.toISOString().slice(0,10);
+    const fmt = (d) => d.toISOString().slice(0, 10);
     return { dateFrom: fmt(from), dateTo: fmt(to) };
   };
 
@@ -61,38 +61,38 @@ export default function VerifiedTruckDetailsFilterPanel({ filters, setFilters, s
       {/* Clickable Header Action Bar */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-5 py-4 bg-slate-50/60 flex items-center justify-between cursor-pointer select-none hover:bg-slate-50 transition-colors"
+        className="px-4 sm:px-5 py-4 bg-slate-50/60 flex items-center justify-between cursor-pointer select-none hover:bg-slate-50 transition-colors gap-2"
       >
-        <div className="flex items-center gap-3">
-          <div className={`p-1.5 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-500'}`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`p-1.5 rounded-lg border transition-colors shrink-0 ${hasActiveFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-500'}`}>
             <SlidersHorizontal className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="font-bold text-slate-800 text-sm tracking-wide flex items-center gap-2">
+          <div className="min-w-0">
+            <h3 className="font-bold text-slate-800 text-sm tracking-wide flex items-center gap-2 truncate">
               Filters
               {hasActiveFilters && (
-                <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ">
+                <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                   Active
                 </span>
               )}
             </h3>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
               {isOpen ? "Click to collapse and hide control panel" : "Click to expand search and operational parameters"}
             </p>
           </div>
         </div>
 
         {/* Right Controls Container */}
-        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
           {hasActiveFilters && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleReset}
-              className="h-8 px-3 text-slate-500 hover:text-rose-600 hover:bg-rose-50 font-bold rounded-lg gap-1.5 text-[10px] uppercase tracking-wider transition-colors"
+              className="h-8 px-2 sm:px-3 text-slate-500 hover:text-rose-600 hover:bg-rose-50 font-bold rounded-lg gap-1.5 text-[10px] uppercase tracking-wider transition-colors"
             >
-              <RotateCcw className="w-3 h-3" />
-              Reset Filters
+              <RotateCcw className="w-3 h-3 shrink-0" />
+              <span className="hidden xs:inline">Reset Filters</span>
             </Button>
           )}
 
@@ -100,15 +100,16 @@ export default function VerifiedTruckDetailsFilterPanel({ filters, setFilters, s
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 transition-colors"
+            aria-label="Toggle filter panel"
           >
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Dynamic Collapsible Grid Section */}
-      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[1200px] border-t border-slate-100 opacity-100' : 'max-h-0 opacity-0'}`}>
-        <CardContent className="p-6">
+      {/* Dynamic Collapsible Grid Section with Scroll Support for Long Content */}
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-t border-slate-100 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <CardContent className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
 
             {/* TRUCK NO */}

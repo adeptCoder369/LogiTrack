@@ -3,11 +3,11 @@ import { PageLayout } from "../components/layout/PageLayout";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { pickupApi, purchaseOrdersApi, depotInventoryApi, getFileUrl, transportersApi, companiesApi, depotsApi, uploadFile } from "../lib/api";
+import { pickupApi, purchaseOrdersApi, depotInventoryApi, companyInventoryApi, getFileUrl, transportersApi, companiesApi, depotsApi, uploadFile } from "../lib/api";
 import { MultiPhotoUpload } from "../components/shared/FileUpload";
 import { usePermissions } from "../lib/permissions";
 import { toast } from "sonner";
-import { Calendar, Eye, FileX, CheckCircle2 } from "lucide-react";
+import { Calendar, Eye, CheckCircle2, Check, X, History, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { VerifyPickupOrdersDataTable } from "@/components/verifyPickup/DataTable";
 import { FilterPanel } from "@/components/verifyPickup/FilterPanel";
@@ -19,6 +19,11 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export default function FinalDispatchVerification() {
   const { hasPermission, hasActionPermission, myDepots, myProducts } = usePermissions();
@@ -46,12 +51,15 @@ export default function FinalDispatchVerification() {
   const [loadedWeights, setLoadedWeights] = useState({});
   const [weightmentSlipFiles, setWeightmentSlipFiles] = useState({});
   const [uploadingWeightment, setUploadingWeightment] = useState({});
+  const [uploadingTare, setUploadingTare] = useState({});
+  const [tareSlipFiles, setTareSlipFiles] = useState({});
 
   const [inputErrors, setInputErrors] = useState({});
 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [selectedPO, setSelectedPO] = useState({});
   const [depotInventory, setDepotInventory] = useState([]);
+  const [companyInventory, setCompanyInventory] = useState([]);
   const [transporters, setTransporters] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [depots, setDepots] = useState([]);
@@ -67,13 +75,15 @@ export default function FinalDispatchVerification() {
         res,
         poRes,
         depotInventoryRes,
+        companyInventoryRes,
         transporterRes,
         companiesRes,
         depotsRes
       ] = await Promise.all([
-        pickupApi.getAll({ status: "weightment_done", start_date: startDate, end_date: endDate }),
+        pickupApi.getAll({ start_date: startDate, end_date: endDate }),
         purchaseOrdersApi.getAll(),
         depotInventoryApi.getAll(),
+        companyInventoryApi.getAll(),
         transportersApi.getAll(),
         companiesApi.getAll(),
         depotsApi.getAll()
@@ -81,6 +91,7 @@ export default function FinalDispatchVerification() {
 
       setPurchaseOrders(poRes.data || []);
       setDepotInventory(depotInventoryRes.data || []);
+      setCompanyInventory(companyInventoryRes.data || []);
       setTransporters(transporterRes.data || []);
       setCompanies(companiesRes.data || []);
       setDepots(depotsRes.data || []);
@@ -102,7 +113,7 @@ export default function FinalDispatchVerification() {
 
   useEffect(() => {
     fetchData();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, statusFilter]);
 
   const handleStartDateChange = (val) => {
     const today = new Date().toISOString().split("T")[0];
@@ -118,11 +129,25 @@ export default function FinalDispatchVerification() {
     setEndDate(val);
   };
 
-  const getAvailableInventory = (depotId, productId) => {
-    const inventory = depotInventory.find(
-      (item) => item.depot_id === depotId && item.product_id === productId
-    );
-    return Number(inventory?.available_quantity || 0);
+  const getAvailableInventory = (sourceType, sourceId, productId) => {
+    if (sourceType === "Company") {
+      const inventory = companyInventory.find(
+        (item) => item.company_id === sourceId && item.product_id === productId
+      );
+      return Number(inventory?.available_quantity || 0);
+    } else {
+      const inventory = depotInventory.find(
+        (item) => item.depot_id === sourceId && item.product_id === productId
+      );
+      return Number(inventory?.available_quantity || 0);
+    }
+  };
+
+  const getStockMessage = (sourceType, available) => {
+    if (sourceType === "Company") {
+      return `Kindly add inventory STOCK IN to proceed. Company available: ${available.toFixed(2)} MT.`;
+    }
+    return `Kindly add inventory STOCK IN to proceed. Depot available: ${available.toFixed(2)} MT.`;
   };
 
   const handleWeightmentSlipUpload = async (pickupId, file) => {
@@ -130,28 +155,51 @@ export default function FinalDispatchVerification() {
     setUploadingWeightment((prev) => ({ ...prev, [pickupId]: true }));
     try {
       const result = await uploadFile(file);
+      await pickupApi.uploadWeightmentSlip(pickupId, { weightment_slip_file_id: result.file_id });
       setWeightmentSlipFiles((prev) => ({ ...prev, [pickupId]: result.file_id }));
-      toast.success("Weightment slip uploaded");
-    } catch {
-      toast.error("Failed to upload weightment slip");
+      toast.success("Weightment slip uploaded and saved");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to upload weightment slip");
     } finally {
       setUploadingWeightment((prev) => ({ ...prev, [pickupId]: false }));
     }
   };
 
-  const handleWeightmentUpdate = async (row) => {
-    const payload = {};
-    if (loadedWeights[row.id]) payload.loaded_weight_mt = parseFloat(loadedWeights[row.id]);
-    if (weightmentSlipFiles[row.id]) payload.weightment_slip_file_id = weightmentSlipFiles[row.id];
-    if (!payload.loaded_weight_mt && !payload.weightment_slip_file_id) return;
+  const handleTareSlipUpload = async (pickupId, file) => {
+    if (!file) return;
+    setUploadingTare((prev) => ({ ...prev, [pickupId]: true }));
     try {
-      await pickupApi.updateWeightment(row.id, payload);
-      toast.success("Weightment updated");
-      setLoadedWeights((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-      setWeightmentSlipFiles((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
-      fetchData();
+      const result = await uploadFile(file);
+      await pickupApi.uploadTareSlip(pickupId, { tare_slip_file_id: result.file_id });
+      setTareSlipFiles((prev) => ({ ...prev, [pickupId]: result.file_id }));
+      toast.success("Tare slip uploaded");
+    } catch {
+      toast.error("Failed to upload tare slip");
+    } finally {
+      setUploadingTare((prev) => ({ ...prev, [pickupId]: false }));
+    }
+  };
+
+  const handleLoadedWeightChange = async (row, value) => {
+    setLoadedWeights((prev) => ({ ...prev, [row.id]: value }));
+    const w = Number(value || 0);
+    const poId = selectedPO[row.id];
+    const po = purchaseOrders.find(p => String(p.id) === String(poId));
+    const available = getAvailableInventory(po?.source_type, po?.depot_id, po?.product_id);
+    setInputErrors((prevErrors) => {
+      const next = { ...prevErrors };
+      if (po && w > available) {
+        next[row.id] = getStockMessage(po?.source_type, available);
+      } else {
+        delete next[row.id];
+      }
+      return next;
+    });
+    if (!value) return;
+    try {
+      await pickupApi.updateWeightment(row.id, { loaded_weight_mt: parseFloat(value) });
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed to update weightment");
+      toast.error(err?.response?.data?.detail || "Failed to update weight");
     }
   };
 
@@ -171,11 +219,14 @@ export default function FinalDispatchVerification() {
         po_date: po?.client_po_date || po?.po_date,
         product_id: po?.product_id,
         product_name: po?.product_name,
-        depot_id: po?.depot_id,
-        depot_name: po?.depot_name,
+        source_id: confirmRow.source_id,
+        source_name: confirmRow.source_name,
+        source_type: confirmRow.source_type,
         company_name: confirmRow.company_name,
         transporter_name: confirmRow.transporter_name,
-        loaded_weight_mt: loadedWeights[confirmRow.id] || confirmRow.loaded_weight_mt
+        loaded_weight_mt: loadedWeights[confirmRow.id] || confirmRow.loaded_weight_mt,
+        tare_slip_file_id: tareSlipFiles[confirmRow.id] || confirmRow.tare_slip_file_id,
+        weightment_slip_file_id: weightmentSlipFiles[confirmRow.id] || confirmRow.weightment_slip_file_id
       });
       toast.success("Final verification done");
       setFinalVerifiedRows((prev) => ({ ...prev, [confirmRow.id]: true }));
@@ -202,6 +253,16 @@ export default function FinalDispatchVerification() {
     )
   ];
 
+  const poCompanies = [
+    ...new Set(
+      purchaseOrders.map(po =>
+        po.source_type === "Company" ? po.depot_name : po.to_company_name
+      ).filter(Boolean)
+    )
+  ];
+
+  const allCompanies = [...uniqueCompanies, ...poCompanies].filter((v, i, a) => a.indexOf(v) === i);
+
   const uniqueDepots = depots.map(d => ({ id: d.id, name: d.name }));
 
   const accessibleDepotIds = !myDepots || myDepots.has_all_access
@@ -220,6 +281,16 @@ export default function FinalDispatchVerification() {
       key: "date",
       label: "Date",
       render: (v) => v ? new Date(v).toLocaleDateString("en-GB") : "-"
+    },
+    {
+      key: "source_name",
+      label: "Source",
+      render: (v, row) => {
+        const sourceId = row.source_id || row.depot_id;
+        if (!sourceId) return "-";
+        const depot = depots.find(d => String(d.id) === String(sourceId));
+        return <span className="text-sm">{depot?.name || row.source_name || row.depot_name || "-"}</span>;
+      }
     },
     {
       key: "transporter_name",
@@ -296,7 +367,11 @@ export default function FinalDispatchVerification() {
       label: "Estimated WT",
       render: (v) => v ? `${Number(v).toFixed(2)} MT` : "-"
     },
-    { key: "driver_phone", label: "Driver" },
+    {
+      key: "driver_phone", label: "Driver"
+    },
+
+
     {
       key: "status",
       label: "Status",
@@ -318,6 +393,185 @@ export default function FinalDispatchVerification() {
         );
       }
     },
+    {
+      key: "loaded_weight_mt",
+      label: "Final Weight",
+      render: (v, row) => {
+        if (row.status !== "final_verified") return "-";
+        return v ? `${Number(v).toFixed(2)} MT` : "-";
+      }
+    },
+    {
+      key: "weightment_slip_file_id",
+      label: "Weight Slip",
+      render: (v, row) => {
+        if (row.status !== "final_verified") return "-";
+        if (!v) return <span className="text-gray-400">-</span>;
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.open(getFileUrl(v), '_blank')}
+          >
+            <Eye className="w-4 h-4 mr-1" />
+            View
+          </Button>
+        );
+      }
+    },
+    {
+      key: "tare_slip_file_id",
+      label: "Tare Slip",
+      render: (v, row) => {
+        if (row.status !== "final_verified") return "-";
+        if (!v) return <span className="text-gray-400">-</span>;
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.open(getFileUrl(v), '_blank')}
+          >
+            <Eye className="w-4 h-4 mr-1" />
+            View
+          </Button>
+        );
+      }
+    },
+
+
+    // ------------------ history
+    {
+      key: "tare_slip_history",
+      label: "Tare Slip History",
+      render: (v, row) => {
+        const history = row.tare_slip_upload_history || [];
+        const latestFileId = row.tare_slip_file_id;
+
+        if (history.length === 0 && !latestFileId) {
+          return <span className="text-gray-400">-</span>;
+        }
+
+        return (
+          <div className="space-y-1">
+            {latestFileId && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-emerald-600 font-medium">Latest:</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1"
+                  onClick={() => window.open(getFileUrl(latestFileId), '_blank')}
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  View
+                </Button>
+              </div>
+            )}
+
+            {history.length > 0 && (
+              <Collapsible className="text-xs">
+                <CollapsibleTrigger className="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+                  <History className="w-3 h-3" />
+                  <span>{history.length} upload{history.length > 1 ? 's' : ''}</span>
+                  <ChevronDown className="w-3 h-3" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
+                    {history.slice(0).reverse().map((entry, idx) => (
+                      <div key={idx} className="border-l-2 border-gray-200 pl-2 py-1 bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{entry.uploaded_by_name || 'Unknown'}</span>
+                          <span className="text-gray-400 mx-1">•</span>
+                          <span className="text-gray-500">{new Date(entry.uploaded_at).toLocaleDateString('en-IN')}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1 mt-1"
+                          onClick={() => window.open(getFileUrl(entry.file_id), '_blank')}
+                        >
+                          <Eye className="w-2 h-2 mr-1" />
+                          View Slip
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {!latestFileId && <span className="text-gray-400 text-xs">No file</span>}
+          </div>
+        );
+      }
+    },
+    {
+      key: "weightment_slip_history",
+      label: "Weightment Slip History",
+      render: (v, row) => {
+        const history = row.weightment_slip_upload_history || [];
+        const latestFileId = row.weightment_slip_file_id;
+
+        if (history.length === 0 && !latestFileId) {
+          return <span className="text-gray-400">-</span>;
+        }
+
+        return (
+          <div className="space-y-1">
+            {latestFileId && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-emerald-600 font-medium">Latest:</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1"
+                  onClick={() => window.open(getFileUrl(latestFileId), '_blank')}
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  View
+                </Button>
+              </div>
+            )}
+
+            {history.length > 0 && (
+              <Collapsible className="text-xs">
+                <CollapsibleTrigger className="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+                  <History className="w-3 h-3" />
+                  <span>{history.length} upload{history.length > 1 ? 's' : ''}</span>
+                  <ChevronDown className="w-3 h-3" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
+                    {history.slice(0).reverse().map((entry, idx) => (
+                      <div key={idx} className="border-l-2 border-gray-200 pl-2 py-1 bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{entry.uploaded_by_name || 'Unknown'}</span>
+                          <span className="text-gray-400 mx-1">•</span>
+                          <span className="text-gray-500">{new Date(entry.uploaded_at).toLocaleDateString('en-IN')}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1 mt-1"
+                          onClick={() => window.open(getFileUrl(entry.file_id), '_blank')}
+                        >
+                          <Eye className="w-2 h-2 mr-1" />
+                          View Slip
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {!latestFileId && <span className="text-gray-400 text-xs">No file</span>}
+          </div>
+        );
+      }
+    },
+
+
     {
       key: "actions",
       label: "Actions",
@@ -353,26 +607,30 @@ export default function FinalDispatchVerification() {
                   setSelectedPO({ ...selectedPO, [row.id]: v });
                   const po = purchaseOrders.find(p => String(p.id) === String(v));
                   const w = Number(loadedWeights[row.id] || row.loaded_weight_mt || 0);
-                  const available = getAvailableInventory(po?.depot_id, po?.product_id);
-                  if (po && w > available) {
-                    setInputErrors({ ...inputErrors, [row.id]: `Kindly add inventory STOCK IN to proceed. Depot available: ${available.toFixed(2)} MT.` });
-                  } else {
-                    const next = { ...inputErrors };
-                    delete next[row.id];
-                    setInputErrors(next);
-                  }
+                  const available = getAvailableInventory(po?.source_type, po?.depot_id, po?.product_id);
+                  setInputErrors((prevErrors) => {
+                    const next = { ...prevErrors };
+                    if (po && w > available) {
+                      next[row.id] = getStockMessage(po?.source_type, available);
+                    } else {
+                      delete next[row.id];
+                    }
+                    return next;
+                  });
                 }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select PO" />
                 </SelectTrigger>
                 <SelectContent>
-                  {purchaseOrders
+{purchaseOrders
                     .filter(po => {
                       if (po.status === 'Completed') return false;
                       const pickupCompany = (row.company_name || "").trim().toLowerCase();
-                      const poCompany = (po.to_company_name || "").trim().toLowerCase();
-                      return pickupCompany === poCompany;
+                      const poCompany = po.to_company_name;
+                      const matchesCompany = pickupCompany === (poCompany || "").trim().toLowerCase();
+                      const hasDepotId = !!po.depot_id;
+                      return matchesCompany && hasDepotId;
                     })
                     .map((po) => {
                       const totalQty = po.total_quantity_mt ? `${Number(po.total_quantity_mt).toFixed(2)} MT` : "-";
@@ -385,38 +643,50 @@ export default function FinalDispatchVerification() {
                               {po.client_po_number || po.po_number} <span className="text-xs font-normal text-blue-500">({totalQty} | Dated: {poDate})</span>
                             </span>
                             <span className="text-[11px] text-gray-500 mt-0.5">
-                              {po.product_name} • {po.depot_name} • {po.to_company_name || "Unknown"} • Remaining: {(po.remaining_quantity_mt || 0).toFixed(2)} MT
+                              {po.product_name} • {po.depot_name || "Unknown"} • Remaining: {(po.remaining_quantity_mt || 0).toFixed(2)} MT
                             </span>
                           </div>
                         </SelectItem>
                       );
                     })}
-                </SelectContent>
+                  </SelectContent>
               </Select>
 
-              {/* LOADED WEIGHT */}
+              {/* LOADED WEIGHT - EDITABLE */}
               <div className="flex gap-2 items-center">
                 <Input
                   placeholder="Loaded Wt (MT)"
                   type="number"
-                  disabled
                   className="w-[130px] h-9 text-xs"
-                  defaultValue={row.loaded_weight_mt || ""}
-                  // onChange={(e) => setLoadedWeights((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                  value={loadedWeights[row.id] ?? row.loaded_weight_mt ?? ""}
+                  onChange={(e) => { handleLoadedWeightChange(row, e.target.value); }}
                 />
 
-                {/* TARE SLIP */}
-                {row.tare_slip_file_id ? (
-                  <Button size="sm" variant="outline" onClick={() => window.open(getFileUrl(row.tare_slip_file_id), '_blank')}>
-                    <Eye className="w-4 h-4 mr-1" /> Tare Slip
-                  </Button>
+                {/* TARE SLIP - UPLOAD/EDIT */}
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  capture="environment"
+                  className="hidden"
+                  id={`fdv-tare-slip-${row.id}`}
+                  onChange={(e) => handleTareSlipUpload(row.id, e.target.files?.[0])}
+                />
+                {tareSlipFiles[row.id] || row.tare_slip_file_id ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => window.open(getFileUrl(tareSlipFiles[row.id] || row.tare_slip_file_id), '_blank')}>
+                      <Eye className="w-4 h-4 mr-1" /> Tare Slip
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => document.getElementById(`fdv-tare-slip-${row.id}`)?.click()}>
+                      Edit
+                    </Button>
+                  </>
                 ) : (
-                  <Button size="sm" variant="outline" disabled={true}>
-                    <FileX className="w-4 h-4 mr-1" /> No Tare Slip
+                  <Button size="sm" variant="outline" disabled={uploadingTare[row.id]} onClick={() => document.getElementById(`fdv-tare-slip-${row.id}`)?.click()}>
+                    {uploadingTare[row.id] ? "Uploading..." : "Upload Tare Slip"}
                   </Button>
                 )}
 
-                {/* WEIGHTMENT SLIP */}
+                {/* WEIGHTMENT SLIP - UPLOAD/EDIT */}
                 <input
                   type="file"
                   accept="image/*,.pdf"
@@ -425,19 +695,20 @@ export default function FinalDispatchVerification() {
                   id={`fdv-wt-slip-${row.id}`}
                   onChange={(e) => handleWeightmentSlipUpload(row.id, e.target.files?.[0])}
                 />
-                {row.weightment_slip_file_id || weightmentSlipFiles[row.id] ? (
-                  <Button size="sm" variant="outline" onClick={() => window.open(getFileUrl(weightmentSlipFiles[row.id] || row.weightment_slip_file_id), "_blank")}>
-                    <Eye className="w-4 h-4 mr-1" /> Wt. Slip
-                  </Button>
+                {weightmentSlipFiles[row.id] || row.weightment_slip_file_id ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => window.open(getFileUrl(weightmentSlipFiles[row.id] || row.weightment_slip_file_id), "_blank")}>
+                      <Eye className="w-4 h-4 mr-1" /> Wt. Slip
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => document.getElementById(`fdv-wt-slip-${row.id}`)?.click()}>
+                      Edit
+                    </Button>
+                  </>
                 ) : (
                   <Button size="sm" variant="outline" disabled={uploadingWeightment[row.id]} onClick={() => document.getElementById(`fdv-wt-slip-${row.id}`)?.click()}>
                     {uploadingWeightment[row.id] ? "Uploading..." : "Upload Wt. Slip"}
                   </Button>
                 )}
-
-                {/* <Button size="sm" variant="outline" onClick={() => handleWeightmentUpdate(row)}>
-                  Save Wt.
-                </Button> */}
               </div>
 
               {inputErrors[row.id] && (
@@ -448,7 +719,7 @@ export default function FinalDispatchVerification() {
               <Button
                 size="sm"
                 onClick={() => { setConfirmRow(row); setConfirmDialogOpen(true); }}
-                disabled={!selectedPO[row.id] || !canVerify}
+                disabled={!selectedPO[row.id] || !canVerify || !!inputErrors[row.id]}
               >
                 Final Verify
               </Button>
@@ -459,18 +730,27 @@ export default function FinalDispatchVerification() {
         return "-";
       }
     },
+
   ];
 
   const filteredData = data.filter((row) => {
-    if (statusFilter !== "all" && row.status !== statusFilter) return false;
+    // When filtering by 'verified' or 'final_verified', show both statuses
+    if (statusFilter !== "all" && statusFilter !== "verified" && statusFilter !== "final_verified") {
+      if (row.status !== statusFilter) return false;
+    }
+    if (statusFilter === "verified" && row.status !== "verified" && row.status !== "final_verified") return false;
+    if (statusFilter === "final_verified" && row.status !== "final_verified") return false;
+
     if (transporterFilter !== "all" && row.transporter_name !== transporterFilter) return false;
 
     const companyName = row.purchase_order_company_name || row.company_name ||
       purchaseOrders.find(p => String(p.id) === String(row.purchase_order_id))?.to_company_name;
     if (companyFilter !== "all" && companyName !== companyFilter) return false;
-    if (depotFilter !== "all" && String(row.depot_id) !== String(depotFilter)) return false;
 
-    if (depotFilter === "all" && accessibleDepotIds && !accessibleDepotIds.includes(row.depot_id)) return false;
+    const rowDepotId = row.depot_id || row.source_id;
+    if (depotFilter !== "all" && String(rowDepotId) !== String(depotFilter)) return false;
+
+    if (depotFilter === "all" && accessibleDepotIds && rowDepotId && !accessibleDepotIds.includes(rowDepotId)) return false;
     if (accessibleProductIds && row.product_id && !accessibleProductIds.includes(row.product_id)) return false;
 
     return true;
@@ -489,9 +769,8 @@ export default function FinalDispatchVerification() {
   });
 
   const stats = {
-    total: filteredData.length,
-    weightment_done: filteredData.filter(d => d.status === "weightment_done").length,
-    final_verified: filteredData.filter(d => d.status === "final_verified").length,
+    weightment_done: data.filter(d => d.status === "weightment_done").length,
+    final_verified: data.filter(d => d.status === "final_verified").length,
   };
 
   if (!canView) {
@@ -514,20 +793,11 @@ export default function FinalDispatchVerification() {
         depotFilter={depotFilter}
         setDepotFilter={setDepotFilter}
         uniqueTransporters={uniqueTransporters}
-        uniqueCompanies={uniqueCompanies}
+        uniqueCompanies={allCompanies}
         uniqueDepots={uniqueDepots}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <button type="button" onClick={() => setStatusFilter("all")}
-          className={`w-full rounded-xl border p-0 transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusFilter === "all" ? "border-slate-900 bg-slate-50" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}>
-          <Card className="border-0 bg-transparent shadow-none rounded-none">
-            <CardContent className="pt-5">
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </CardContent>
-          </Card>
-        </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <button type="button" onClick={() => setStatusFilter("weightment_done")}
           className={`w-full rounded-xl border p-0 transition focus:outline-none focus:ring-2 focus:ring-purple-500 ${statusFilter === "weightment_done" ? "border-purple-600 bg-purple-100" : "border-slate-200 bg-purple-50/50 hover:border-purple-400 hover:bg-purple-100"}`}>
           <Card className="border-0 bg-transparent shadow-none rounded-none">
@@ -564,7 +834,7 @@ export default function FinalDispatchVerification() {
         columns={columns}
         data={sortedData}
         loading={loading}
-        emptyMessage="No weightment done entries found"
+        emptyMessage={`No ${statusFilter === "weightment_done" ? "weightment done" : statusFilter === "final_verified" ? "final verified" : "entries"} entries found`}
       />
 
       <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
@@ -579,9 +849,64 @@ export default function FinalDispatchVerification() {
               <div className="text-slate-600">Transporter: <strong>{confirmRow?.transporter_name || "-"}</strong></div>
               <div className="text-slate-600">Company: <strong>{confirmRow?.company_name || "-"}</strong></div>
               <div className="text-slate-600">
-                PO: <strong>{purchaseOrders.find(p => String(p.id) === String(selectedPO[confirmRow?.id]))?.client_po_number || confirmRow?.purchase_order_no || "-"}</strong>
+                PO: <strong>{purchaseOrders.find(p => String(p.id) === String(selectedPO[confirmRow?.id]))?.client_po_number || purchaseOrders.find(p => String(p.id) === String(selectedPO[confirmRow?.id]))?.po_number || confirmRow?.purchase_order_no || "-"}</strong>
               </div>
               <div className="text-slate-600">Loaded Weight: <strong>{loadedWeights[confirmRow?.id] || confirmRow?.loaded_weight_mt || "-"} MT</strong></div>
+              {(() => {
+                const po = purchaseOrders.find(p => String(p.id) === String(selectedPO[confirmRow?.id]));
+                const loadedWt = Number(loadedWeights[confirmRow?.id] || confirmRow?.loaded_weight_mt || 0);
+                const estWt = Number(confirmRow?.estimated_weight_mt || 0);
+                const diff = loadedWt - estWt;
+                return (
+                  <>
+                    <div className="text-slate-600">Est. Weight: <strong>{estWt ? estWt.toFixed(2) : "-"} MT</strong></div>
+                    <div className="text-slate-600">Diff (Loaded Wt. - Est. Wt.): <strong className={diff >= 0 ? "text-emerald-600" : "text-red-600"}>{diff ? diff.toFixed(2) : "-"} MT</strong></div>
+                  </>
+                );
+              })()}
+              <div className="flex gap-4 pt-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500">Weightment Slip:</span>
+                  {(weightmentSlipFiles[confirmRow?.id] || confirmRow?.weightment_slip_file_id) ? (
+                    <Check className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <X className="w-4 h-4 text-red-500" />
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500">Tare Slip:</span>
+                  {(tareSlipFiles[confirmRow?.id] || confirmRow?.tare_slip_file_id) ? (
+                    <Check className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <X className="w-4 h-4 text-red-500" />
+                  )}
+                </div>
+              </div>
+              {/* {confirmRow?.tare_slip_upload_history && confirmRow.tare_slip_upload_history.length > 0 && (
+                <div className="pt-2">
+                  <div className="text-xs text-slate-500 mb-1">Tare Slip Upload History:</div>
+                  <div className="max-h-32 overflow-y-auto border rounded p-2 bg-gray-50">
+                    {confirmRow.tare_slip_upload_history.slice(-3).reverse().map((entry, idx) => (
+                      <div key={idx} className="text-xs flex justify-between items-center py-1 border-b last:border-0">
+                        <div>
+                          <span className="font-medium">{entry.uploaded_by_name || 'Unknown'}</span>
+                          <span className="text-gray-400 mx-1">•</span>
+                          <span className="text-gray-500">{new Date(entry.uploaded_at).toLocaleDateString('en-IN')}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1"
+                          onClick={() => window.open(getFileUrl(entry.file_id), '_blank')}
+                        >
+                          <Eye className="w-2 h-2 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )} */}
             </div>
           </div>
           <DialogFooter>

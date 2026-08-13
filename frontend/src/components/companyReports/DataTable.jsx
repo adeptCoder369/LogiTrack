@@ -2,8 +2,7 @@ import { Package } from 'lucide-react';
 
 export const CompanyReportsDataTable = ({
   productsList,
-  isExpanded,
-  totalPO
+  isExpanded
 }) => {
 
 
@@ -37,7 +36,7 @@ export const CompanyReportsDataTable = ({
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-right">
                         <div>
                           <p className="text-sky-600">PO Qty</p>
-                          <p className="font-bold text-sky-700">{(totalPO).toFixed(2)} MT</p>
+                          <p className="font-bold text-sky-700">{(product.totalPOQuantity || 0).toFixed(2)} MT</p>
                         </div>
                         <div>
                           <p className="text-gray-500">Quantity</p>

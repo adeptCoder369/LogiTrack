@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user, check_permission
 from models import RailwayZone, RailwayZoneCreate
 

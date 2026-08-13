@@ -1,5 +1,5 @@
 const config = {
-  appId: "com.infoeight.logitrack",
+  appId: "com.ibrmco.infoeight",
   appName: "IBRMCO",
   webDir: "build",
   server: {

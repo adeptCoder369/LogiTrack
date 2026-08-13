@@ -1,4 +1,4 @@
-package com.infoeight.logitrack;
+package com.ibrmco.infoeight;
 
 import com.getcapacitor.BridgeActivity;
 

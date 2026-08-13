@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button } from '../ui/button';
-import { X, Calendar, Search, Building2, Warehouse, SlidersHorizontal } from 'lucide-react';
+import { X, Calendar, Search, Building2, Warehouse, SlidersHorizontal, ChevronDown } from 'lucide-react';
 
 export default function FilterPanel({
   filters,
@@ -13,29 +14,45 @@ export default function FilterPanel({
   clearFilters,
   hasActiveFilters
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <div className="w-full p-5 bg-card border border-border rounded-xl shadow-sm space-y-5 transition-all duration-200">
+    <div className="w-full p-4 sm:p-5 bg-card border border-border rounded-xl shadow-sm space-y-4 transition-all duration-200">
       {/* Header Info Block */}
       <div className="flex items-center justify-between border-b border-border pb-3">
-        <div className="flex items-center gap-2 text-foreground font-semibold text-sm tracking-wide uppercase">
-          <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
-          <span>Filters</span>
-        </div>
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors rounded-lg"
-            onClick={clearFilters}
+        <div className="flex items-center gap-2">
+          {/* Toggle Button for Small Devices */}
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex items-center gap-2 text-foreground font-semibold text-sm tracking-wide uppercase sm:cursor-default"
           >
-            <X className="w-3.5 h-3.5 mr-1.5" />
-            Clear active filters
-          </Button>
-        )}
+            <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+            <span>Filters</span>
+            {hasActiveFilters && (
+              <span className="flex h-2 w-2 rounded-full bg-primary" />
+            )}
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 sm:hidden ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors rounded-lg"
+              onClick={clearFilters}
+            >
+              <X className="w-3.5 h-3.5 mr-1.5" />
+              Clear active filters
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Main Filter Fields Layout */}
-      <div className="grid gap-x-4 gap-y-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end">
+      {/* Main Filter Fields Layout - Collapsible on small devices, always visible on sm and up */}
+      <div className={`${isOpen ? 'grid' : 'hidden sm:grid'} gap-x-4 gap-y-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end transition-all`}>
         {/* From Date */}
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">

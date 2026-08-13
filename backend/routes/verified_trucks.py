@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 
-from database import db
+from .db_compat import db
 from models import VerifiedTruck, VerifiedTruckCreate
 from auth_utils import get_current_user, check_permission, build_product_filter
 

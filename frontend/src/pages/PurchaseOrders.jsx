@@ -45,6 +45,8 @@ export default function PurchaseOrders() {
   const [reopenOpen, setReopenOpen] = useState(false);
   const [reopenLoading, setReopenLoading] = useState(false);
 
+  const [statementEstimateInfo, setStatementEstimateInfo] = useState(null);
+
   const [filters, setFilters] = useState({
     status: 'all',
     depotId: 'all',
@@ -58,10 +60,9 @@ export default function PurchaseOrders() {
   const { hasPermission } = usePermissions();
 
   const [formData, setFormData] = useState({
-    source_type: 'Depot',
-    source_company_id: '',
     depot_id: '',
     depot_name: '',
+    source_type: 'Depot',
     to_company_id: '',
     to_company_name: '',
     product_id: '',
@@ -100,6 +101,93 @@ export default function PurchaseOrders() {
     }
   };
   console.log(' orders', filters)
+  const calculateEstimateInfo = (record) => {
+    if (!record) return null;
+
+    const statusValue = String(record.status || '').trim().toLowerCase();
+    const isCompleted = statusValue === 'completed' || statusValue === 'fully dispatched';
+
+    const rawPoDate = record?.client_po_date || record?.po_date;
+    const rawEstDate = record?.estimated_completion_date;
+
+    if (!rawPoDate || !rawEstDate) return null;
+
+    const poDate = new Date(rawPoDate);
+    const estCompDate = new Date(rawEstDate);
+    const currentDate = new Date();
+
+    poDate.setHours(0, 0, 0, 0);
+    estCompDate.setHours(0, 0, 0, 0);
+    currentDate.setHours(0, 0, 0, 0);
+
+    const msPerDay = 24 * 60 * 60 * 1000;
+
+    const refDate = isCompleted
+      ? (() => {
+        const fd = record?.actual_completion_date || record?.updated_at
+          ? new Date(record?.actual_completion_date || record?.updated_at)
+          : new Date();
+        fd.setHours(0, 0, 0, 0);
+        return fd < poDate ? poDate : fd;
+      })()
+      : currentDate;
+
+    const x = Math.max(0, Math.floor((refDate - poDate) / msPerDay));
+    const y = Math.floor((estCompDate - poDate) / msPerDay);
+
+    const dispatched = Number(record?.dispatched_quantity_mt || 0);
+    const totalQty = Number(record?.total_quantity_mt || 0);
+    const isExceeded = dispatched > totalQty;
+
+    let trackingText = "";
+    let trackingColorClass = "text-gray-500";
+
+    if (isCompleted) {
+      const finishDate = record?.actual_completion_date || record?.updated_at
+        ? new Date(record?.actual_completion_date || record?.updated_at)
+        : new Date();
+      finishDate.setHours(0, 0, 0, 0);
+      const trueFinishDate = finishDate < poDate ? poDate : finishDate;
+      const varianceDays = Math.floor((trueFinishDate - estCompDate) / msPerDay);
+
+      if (varianceDays < 0) {
+        trackingText = `${Math.abs(varianceDays)} days before`;
+        trackingColorClass = "text-green-600 font-medium";
+      } else if (varianceDays === 0) {
+        trackingText = "On time";
+        trackingColorClass = "text-green-600 font-medium";
+      } else {
+        trackingText = `${varianceDays} days delay`;
+        trackingColorClass = "text-red-600 font-semibold";
+      }
+    } else {
+      const remainingDays = Math.floor((estCompDate - currentDate) / msPerDay);
+
+      if (isExceeded) {
+        trackingText = "Quantity Exceeded";
+        trackingColorClass = "text-red-600 font-bold";
+      } else if (remainingDays > 0) {
+        trackingText = `${remainingDays} days left`;
+        trackingColorClass = "text-amber-600 font-medium";
+      } else if (remainingDays === 0) {
+        trackingText = "Due today";
+        trackingColorClass = "text-amber-500 font-bold";
+      } else {
+        trackingText = `${Math.abs(remainingDays)} days delay`;
+        trackingColorClass = "text-red-600 font-semibold";
+      }
+    }
+
+    return {
+      x,
+      y,
+      trackingText,
+      trackingColorClass,
+      estCompDateStr: estCompDate.toLocaleDateString("en-IN"),
+      isCompleted
+    };
+  };
+
   const openStatement = async (row) => {
 
     try {
@@ -111,6 +199,7 @@ export default function PurchaseOrders() {
       );
 
       setStatementData(res.data);
+      setStatementEstimateInfo(calculateEstimateInfo(row));
       setStatementOpen(true);
 
     } catch {
@@ -128,6 +217,7 @@ export default function PurchaseOrders() {
     setFormData({
       depot_id: '',
       depot_name: '',
+      source_type: 'Depot',
       to_company_id: '',
       to_company_name: '',
       product_id: '',
@@ -175,18 +265,14 @@ export default function PurchaseOrders() {
     setSelectedItem(item);
 
     setFormData({
-      source_type: item.source_type || 'Depot',
-      source_company_id: item.source_company_id || '',
       depot_id: item.depot_id || '',
       depot_name: item.depot_name || '',
-
+      source_type: item.source_type || 'Depot',
       to_company_id: item.to_company_id || '',
       to_company_name: item.to_company_name || '',
-
       product_id: item.product_id || '',
       product_name: item.product_name || '',
       product_code: item.product_code || '',
-
       total_quantity_mt: item.total_quantity_mt || '',
       remarks: item.remarks || '',
       client_po_number: item.client_po_number || '',
@@ -212,17 +298,8 @@ export default function PurchaseOrders() {
     const c = companies.find(x => x.id === id);
     setFormData({
       ...formData,
-      to_company_id: id,
-      to_company_name: c?.name || ''
-    });
-  };
-
-  const handleSourceCompanyChange = (id) => {
-    const c = companies.find(x => x.id === id);
-    setFormData({
-      ...formData,
-      source_company_id: id,
-      source_company_name: c?.name || ''
+      depot_id: id,
+      depot_name: c?.name || ''
     });
   };
 
@@ -239,11 +316,19 @@ export default function PurchaseOrders() {
   const handleSubmit = async () => {
     if (
       !formData.product_id ||
-      !formData.to_company_id ||
-      !formData.total_quantity_mt ||
-      ((formData.source_type === 'Depot' && !formData.depot_id) || (formData.source_type === 'Company' && !formData.source_company_id))
+      !formData.total_quantity_mt
     ) {
       toast.error('Please fill required fields');
+      return;
+    }
+
+    if (formData.source_type === 'Depot' && !formData.depot_id) {
+      toast.error('Depot is required when source is Depot');
+      return;
+    }
+
+    if (formData.source_type === 'Company' && !formData.depot_id) {
+      toast.error('Source company is required when source is Company');
       return;
     }
 
@@ -457,12 +542,24 @@ export default function PurchaseOrders() {
       }
     },
 
-    { 
-      key: 'source_type', 
-      label: 'Source',
-      render: (v) => v === 'Company' ? 'Company' : 'Depot'
+    {
+      key: 'depot_name',
+      label: 'Depot/Company',
+      render: (v, row) => {
+        const sourceType = row.source_type || 'Depot';
+        const typeColor = sourceType === 'Company'
+          ? 'bg-purple-100 text-purple-700 border-purple-200'
+          : 'bg-slate-100 text-slate-700 border-slate-200';
+        return (
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">{v || '-'}</span>
+            <span className={`inline-flex self-start text-[10px] font-semibold px-1.5 py-0.5 rounded border ${typeColor}`}>
+              {sourceType}
+            </span>
+          </div>
+        );
+      }
     },
-    { key: 'source_company_name', label: 'Source Company' },
     { key: 'to_company_name', label: 'Client' },
     { key: 'product_name', label: 'Product' },
 
@@ -603,14 +700,15 @@ export default function PurchaseOrders() {
       render: (v, record) => {
         const statusValue = String(v || '').trim().toLowerCase();
         const isCompleted = statusValue === 'completed' || statusValue === 'fully dispatched';
+        const isOpen = statusValue === 'open';
 
-        const rawPoDate = record?.po_date || record?.client_po_date;
+        const rawPoDate = record?.client_po_date || record?.po_date;
         const rawEstDate = record?.estimated_completion_date;
 
         if (!rawPoDate || !rawEstDate) {
           return (
             <div className="flex flex-col gap-1 items-start">
-              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${isCompleted ? 'bg-green-100 text-green-700' : isOpen ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
                 }`}>
                 {v || 'Unknown'}
               </span>
@@ -633,9 +731,18 @@ export default function PurchaseOrders() {
 
         const msPerDay = 24 * 60 * 60 * 1000;
 
-        // Calculate x & y with logical floors
-        const x = Math.max(0, Math.floor((currentDate - poDate) / msPerDay));
-        const y = Math.max(1, Math.floor((estCompDate - poDate) / msPerDay));
+        const refDate = isCompleted
+          ? (() => {
+            const fd = record?.actual_completion_date || record?.updated_at
+              ? new Date(record?.actual_completion_date || record?.updated_at)
+              : new Date();
+            fd.setHours(0, 0, 0, 0);
+            return fd < poDate ? poDate : fd;
+          })()
+          : currentDate;
+
+        const x = Math.max(0, Math.floor((refDate - poDate) / msPerDay));
+        const y = Math.floor((estCompDate - poDate) / msPerDay);
 
         // Calculate fulfillment metrics for warning highlights
         const dispatched = Number(record?.dispatched_quantity_mt || 0);
@@ -690,9 +797,11 @@ export default function PurchaseOrders() {
             {/* Main Status Pill Badge */}
             <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${isCompleted
               ? 'bg-green-100 text-green-700'
-              : isExceeded
-                ? 'bg-red-100 text-red-700'
-                : 'bg-blue-100 text-blue-700'
+              : isOpen
+                ? 'bg-amber-100 text-amber-700'
+                : isExceeded
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-blue-100 text-blue-700'
               }`}>
               {isExceeded && !isCompleted ? 'Over Dispatched' : v}
             </span>
@@ -792,7 +901,7 @@ export default function PurchaseOrders() {
       />
 
       {/* Summary */}
-      <div className="grid grid-cols-4 gap-4 mb-6 mt-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 mt-6">
         <Card>
           <CardContent className="pt-4">
             <p>Total POs</p>
@@ -822,12 +931,19 @@ export default function PurchaseOrders() {
           <CardContent className="pt-4">
             <p>Remaining</p>
             <p className="text-2xl font-bold text-orange-600">
-              {filteredOrders.reduce((s, o) => s + (isCompletedOrder(o) ? 0 : (Number(o.remaining_quantity_mt) || 0)), 0)} MT
+              {filteredOrders
+                .reduce(
+                  (s, o) => s + (isCompletedOrder(o) ? 0 : (Number(o.remaining_quantity_mt) || 0)),
+                  0
+                )
+                .toLocaleString("en-IN", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })} MT
             </p>
           </CardContent>
         </Card>
       </div>
-
       <PurchaseOrdersDataTable
         columns={columns}
         data={filteredOrders}
@@ -849,39 +965,80 @@ export default function PurchaseOrders() {
         <div className="space-y-4">
 
           <div>
-            <Label>Source Type *</Label>
+            <Label>Source *</Label>
             <Select
               value={formData.source_type}
-              onValueChange={(v) => setFormData({ ...formData, source_type: v, source_company_id: '', depot_id: '' })}
+              onValueChange={(v) => setFormData({ ...formData, source_type: v })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select source type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Depot">Depot</SelectItem>
-                <SelectItem value="Company">Company</SelectItem>
+                <SelectItem value="Depot">From Depot</SelectItem>
+                <SelectItem value="Company">From Company</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {formData.source_type === 'Company' ? (
+          {formData.source_type === 'Company' && (
             <div>
               <Label>Source Company *</Label>
               <Select
-                value={formData.source_company_id}
-                onValueChange={handleSourceCompanyChange}
+                value={formData.depot_id}
+                onValueChange={handleCompanyChange}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select source company" />
+                  <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  {companies.filter(c => c.company_type === 'Source' || c.company_type === 'Both').map(c => (
+                  {companies.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : (
+          )}
+
+          {formData.source_type === 'Company' && (
+            <div>
+              <Label>Client Company *</Label>
+              <Select
+                value={formData.to_company_id}
+                onValueChange={(id) => {
+                  const c = companies.find(x => x.id === id);
+                  setFormData({
+                    ...formData,
+                    to_company_id: id,
+                    to_company_name: c?.name || ''
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.filter(c => c.id !== formData.depot_id).map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        {c.logo_file_id ? (
+                          <img
+                            src={getFileUrl(c.logo_file_id)}
+                            alt={c.name}
+                            className="w-5 h-5 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span className="w-5 h-5 rounded-full bg-gray-100 border border-gray-200 shrink-0" />
+                        )}
+                        <span>{c.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {formData.source_type === 'Depot' && (
             <div>
               <Label>Depot *</Label>
               <Select
@@ -900,23 +1057,44 @@ export default function PurchaseOrders() {
             </div>
           )}
 
-          <div>
-            <Label>Client Company *</Label>
-            <Select
-              value={formData.to_company_id}
-              onValueChange={handleCompanyChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select company" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+          {formData.source_type === 'Depot' && (
+            <div>
+              <Label>Client Company *</Label>
+              <Select
+                value={formData.to_company_id}
+                onValueChange={(id) => {
+                  const c = companies.find(x => x.id === id);
+                  setFormData({
+                    ...formData,
+                    to_company_id: id,
+                    to_company_name: c?.name || ''
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        {c.logo_file_id ? (
+                          <img
+                            src={getFileUrl(c.logo_file_id)}
+                            alt={c.name}
+                            className="w-5 h-5 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span className="w-5 h-5 rounded-full bg-gray-100 border border-gray-200 shrink-0" />
+                        )}
+                        <span>{c.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label>Product *</Label>
@@ -934,7 +1112,6 @@ export default function PurchaseOrders() {
               </SelectContent>
             </Select>
           </div>
-
 
           <div>
             <Label>PO Number</Label>
@@ -963,9 +1140,7 @@ export default function PurchaseOrders() {
             />
           </div>
 
-
-
-  <div>
+          <div>
             <Label>Quantity (MT) *</Label>
             <Input
               type="number"
@@ -974,27 +1149,6 @@ export default function PurchaseOrders() {
             />
           </div>
 
-
-
-
-          <div>
-            <Label>Depot *</Label>
-            <Select
-              value={formData.depot_id}
-              onValueChange={handleDepotChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select depot" />
-              </SelectTrigger>
-              <SelectContent>
-                {depots.map(d => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-  
           <div>
             <Label>Remarks</Label>
             <Input
@@ -1014,7 +1168,7 @@ export default function PurchaseOrders() {
           </div>
 
 
-      
+
 
           {selectedItem && ['completed', 'fully dispatched'].includes(String(selectedItem.status || '').trim().toLowerCase()) && (
             <div>
@@ -1125,6 +1279,7 @@ export default function PurchaseOrders() {
       <POStatementModal
         statementData={statementData}
         statementOpen={statementOpen}
+        estimateInfo={statementEstimateInfo}
         handleDownloadExcel={handleDownloadExcel}
         handleDownloadPDF={handleDownloadPDF}
         setStatementOpen={setStatementOpen}

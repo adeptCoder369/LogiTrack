@@ -7,142 +7,185 @@ import { permissionsApi } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { toast } from 'sonner';
 
-const defaultPermissions = {
-  // Dashboard
-  "Dashboard": {
-    "Admin": true,
-    "Management": true,
-    "Loader": true, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true
-  },
+const ensureRoleInPermissions = (permissions) => Object.fromEntries(
+  Object.entries(permissions).map(([module, roleMap]) => {
+    if (!roleMap || typeof roleMap !== 'object') {
+      return [module, roleMap];
+    }
+
+    const normalizedRoleMap = { ...roleMap };
+    if (!Object.prototype.hasOwnProperty.call(normalizedRoleMap, 'Dispatch Verifier')) {
+      const fallbackValue =
+        roleMap['Weightment'] ??
+        roleMap['Depot Supervisor'] ??
+        roleMap['Depot Staff'] ??
+        roleMap['Loader'] ??
+        false;
+
+      normalizedRoleMap['Dispatch Verifier'] = fallbackValue;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(normalizedRoleMap, 'Transporter')) {
+      const fallbackValue =
+        roleMap['Weightment'] ??
+        roleMap['Depot Supervisor'] ??
+        roleMap['Depot Staff'] ??
+        roleMap['Loader'] ??
+        false;
+
+      normalizedRoleMap['Transporter'] = fallbackValue;
+    }
+
+    return [module, normalizedRoleMap];
+  })
+);
+
+const defaultPermissions = ensureRoleInPermissions({
+// Dashboard
+   "Dashboard": {
+     "Admin": true,
+     "Management": true,
+     "Loader": true,
+     "Weightment": true,
+     "Transporter": true,
+     "Depot Staff": true,
+     "Depot Supervisor": true
+   },
 
   // Delivery Orders
-  "Delivery Orders (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Delivery Orders (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Delivery Orders (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Delivery Orders (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Delivery Orders (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Delivery Orders (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Delivery Orders (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Delivery Orders (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Purchase Orders
-  "Purchase Orders (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Purchase Orders (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Purchase Orders (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Purchase Orders (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Purchase Orders (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Purchase Orders (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Purchase Orders (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Purchase Orders (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Primary Liftings
-  "Primary Liftings (View)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Primary Liftings (Create)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Primary Liftings (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Primary Liftings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Primary Liftings (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": false, "Transporter": true, "Depot Staff": false, "Depot Supervisor": false },
+  "Primary Liftings (Create)": { "Admin": true, "Management": true, "Loader": true, "Weightment": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Primary Liftings (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Primary Liftings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Secondary Liftings
-  // "Secondary Liftings (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  // "Secondary Liftings (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  // "Secondary Liftings (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": false },
-  // "Secondary Liftings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  // "Secondary Liftings (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Depot Staff": true, "Depot Supervisor": true },
+  // "Secondary Liftings (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Depot Staff": true, "Depot Supervisor": true },
+  // "Secondary Liftings (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Depot Staff": false, "Depot Supervisor": false },
+  // "Secondary Liftings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Depot Staff": false, "Depot Supervisor": false },
 
 
 
 
 
-  
-  // Liftings (combined views / dashboards)
-  "Liftings (View)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Liftings (Create)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Liftings (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": false },
-  "Liftings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Liftings (combined views / dashboards)
-  "Schedule Pickup": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Pickup (Execution)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Verify Pickup": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": true },
-  "Final Dispatch Verification": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": true },
+  "Liftings (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Liftings (Create)": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Liftings (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Liftings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
-  // Verification
-  "Verification (Unloading)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": false },
+  // Liftings (combined views / dashboards)
+  "Schedule Pickup": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Transporter": false, "Depot Staff": true, "Depot Supervisor": true },
+  "Pickup (Execution)": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Verify Pickup": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Transporter": false, "Depot Staff": false, "Depot Supervisor": true },
+  "Final Dispatch Verification": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Dispatch Verifier": true, "Transporter": true, "Depot Staff": false, "Depot Supervisor": true },
+
+// Verification
+  "Verification (Unloading)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": true },
 
   // Verified Trucks Details
-  "Verified Trucks Details (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Verified Trucks Details (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": false },
-  "Verified Trucks Details (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": false },
-  "Verified Trucks Details (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Verified Trucks Details (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Verified Trucks Details (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Verified Trucks Details (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Verified Trucks Details (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Inventory Wallet
-  "Inventory Wallet (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Inventory Wallet (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": false, "Depot Supervisor": false },
-  "Inventory Wallet (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Inventory Wallet (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Inventory Wallet (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": false, "Depot Supervisor": false },
+  "Inventory Wallet (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // DO Wallet
-  // "DO Wallet (View)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  // "DO Wallet (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  // "DO Wallet (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": false, "Depot Staff": false, "Depot Supervisor": false },
+  // "DO Wallet (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Companies
-  "Companies (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Companies (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Companies (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Companies (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Companies (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Companies (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Companies (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Companies (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Company Users
-  "Company Users (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Company Users (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Company Users (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Company Users (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Company Users (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Company Users (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Company Users (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Company Users (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
-// Transporters
-  "Transporters (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Transporters (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Transporters (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Transporters (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  // Transporters
+  "Transporters (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Transporters (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Transporters (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Transporters (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Transporter Users
-  "Transporter Users (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Transporter Users (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Transporter Users (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Transporter Users (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Transporter Users (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": false, "Depot Supervisor": false },
+  "Transporter Users (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Transporter Users (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Transporter Users (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
-// Trucks
-  "Trucks (View)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Trucks (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Trucks (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Trucks (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  // Trucks
+  "Trucks (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Trucks (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Trucks (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Trucks (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
-// Railway Sidings
-  "Railway Sidings (View)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Railway Sidings (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Railway Sidings (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Railway Sidings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  // Railway Sidings
+  "Railway Sidings (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Railway Sidings (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Railway Sidings (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Railway Sidings (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Railway Zones
-  "Railway Zones (View)": { "Admin": true, "Management": true, "Loader": true, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Railway Zones (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Railway Zones (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Railway Zones (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Railway Zones (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Railway Zones (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Railway Zones (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Railway Zones (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Products
-  "Products (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Products (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Products (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Products (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Products (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Products (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Products (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Products (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Product Access
-  "Product Access (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Product Access (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
-// Depots
-  "Depots (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": true, "Depot Staff": true, "Depot Supervisor": true },
-  "Depots (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Depots (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "Depots (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  // Depots
+  "Depots (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Depots (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Depots (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Depots (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // User Management
-  "User Management (View)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "User Management (Create)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "User Management (Update)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
-  "User Management (Delete)": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "User Management (View)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "User Management (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "User Management (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "User Management (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
   // Role Permissions
-  "Role Permissions": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Role Permissions": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
 
-// Analytics
-   "Analytics": { "Admin": true, "Management": true, "Loader": false, "Depot Manager": false, "Depot Staff": false, "Depot Supervisor": false }
-};
+  // Analytics
+  "Analytics": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+
+  // Downloads
+  "Downloads (View)": { "Admin": true, "Management": true, "Loader": true, "Weightment": true, "Dispatch Verifier": false, "Transporter": true, "Depot Staff": true, "Depot Supervisor": true },
+  "Downloads (Create)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Downloads (Update)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false },
+  "Downloads (Delete)": { "Admin": true, "Management": true, "Loader": false, "Weightment": false, "Dispatch Verifier": false, "Transporter": false, "Depot Staff": false, "Depot Supervisor": false }
+});
 
 // Define dependent permissions - when a parent permission is granted/revoked, these are auto-toggled
 const PERMISSION_DEPENDENCIES = {
@@ -186,18 +229,22 @@ const routeDisplayNames = {
   'Product Access (View)': 'Product Access',
   'Analytics': 'Analytics',
 
+  'Downloads (View)': 'Downloads',
+
   'Purchase Orders (View)': 'Purchase Orders',
   'Company Reports': 'Company Reports',
   'Liftings Reports': 'Lifting Reports',
 };
 
-const roles = ['Management', 'Admin', 'Loader', 'Depot Manager', 'Depot Staff', 'Depot Supervisor'];
+const roles = ['Management', 'Admin', 'Loader', 'Weightment', 'Dispatch Verifier', 'Transporter', 'Depot Staff', 'Depot Supervisor'];
 
 const roleColors = {
   'Admin': { bg: 'bg-red-500', border: 'border-red-200', light: 'bg-red-50', text: 'text-red-800' },
   'Management': { bg: 'bg-slate-500', border: 'border-slate-200', light: 'bg-slate-50', text: 'text-slate-800' },
   'Loader': { bg: 'bg-blue-500', border: 'border-blue-200', light: 'bg-blue-50', text: 'text-blue-800' },
-  'Depot Manager': { bg: 'bg-green-500', border: 'border-green-200', light: 'bg-green-50', text: 'text-green-800' },
+  'Weightment': { bg: 'bg-green-500', border: 'border-green-200', light: 'bg-green-50', text: 'text-green-800' },
+  'Dispatch Verifier': { bg: 'bg-amber-500', border: 'border-amber-200', light: 'bg-amber-50', text: 'text-amber-800' },
+  'Transporter': { bg: 'bg-cyan-500', border: 'border-cyan-200', light: 'bg-cyan-50', text: 'text-cyan-800' },
   'Depot Supervisor': { bg: 'bg-orange-500', border: 'border-orange-200', light: 'bg-orange-50', text: 'text-orange-800' },
   'Depot Staff': { bg: 'bg-purple-500', border: 'border-purple-200', light: 'bg-purple-50', text: 'text-purple-800' },
 };
@@ -321,8 +368,8 @@ export default function RolePermissions() {
   //    } finally {
   //      setLoading(false);
   //    }
-//  };
-   const handleToggle = async (module, role) => {
+  //  };
+  const handleToggle = async (module, role) => {
     if (!isAdmin) {
       toast.error('Only Management can modify permissions');
       return;
@@ -336,11 +383,11 @@ export default function RolePermissions() {
     newPermissions[module] = { ...newPermissions[module] };
     const newValue = !newPermissions[module][role];
     newPermissions[module][role] = newValue;
-    
+
     // Auto-toggle dependent permissions when granting (only if not already revoked by another parent)
     const dependencies = PERMISSION_DEPENDENCIES[module] || [];
     const toggledModules = []; // Track modules we toggled for rollback
-    
+
     if (newValue) {
       // Granting: auto-grant dependencies
       for (const depModule of dependencies) {
@@ -356,7 +403,7 @@ export default function RolePermissions() {
             newPermissions[depModule] = { ...newPermissions[depModule] };
             newPermissions[depModule][role] = true;
             toggledModules.push(depModule);
-            permissionsApi.toggle(depModule, role).catch(() => {});
+            permissionsApi.toggle(depModule, role).catch(() => { });
           }
         }
       }
@@ -374,12 +421,12 @@ export default function RolePermissions() {
             newPermissions[depModule] = { ...newPermissions[depModule] };
             newPermissions[depModule][role] = false;
             toggledModules.push(depModule);
-            permissionsApi.toggle(depModule, role).catch(() => {});
+            permissionsApi.toggle(depModule, role).catch(() => { });
           }
         }
       }
     }
-    
+
     setPermissions(newPermissions);
     setHasChanges(true);
 
@@ -498,7 +545,7 @@ export default function RolePermissions() {
       )}
 
       {/* Role Summary Blocks */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-4 mb-8">
         {roles.map((role) => {
           const colors = roleColors[role];
           const permCount = modulesList.filter(m => permissions[m]?.[role]).length;
@@ -533,16 +580,16 @@ export default function RolePermissions() {
           </div>
         </CardHeader>
 
-        <CardContent className="p-0">
+        <CardContent className="p-0 flex flex-col">
           {/* Main Matrix Sticky Columns Layout Header */}
-          <div className="hidden md:grid md:grid-cols-12 items-center border-b bg-gray-50/70 py-4 px-6 text-sm font-semibold text-gray-700">
+          <div className="hidden md:grid md:grid-cols-12 items-center border-b bg-gray-50/95 py-4 px-6 text-sm font-semibold text-gray-700 sticky top-0 z-20 backdrop-blur-sm">
             <div className="col-span-4">Module / Feature Group</div>
-            <div className="col-span-8 grid grid-cols-6 text-center">
+            <div className="col-span-8 grid grid-cols-8 text-center">
               {roles.map((role) => (
                 <div key={role} className="flex flex-col items-center gap-1">
                   <div className={`w-3 h-3 ${roleColors[role].bg} rounded-full`} />
                   <span className="text-xs font-medium text-gray-600">
-                    {role === 'Depot Manager' ? 'Depot Mgr' : role}
+                    {role === 'Weightment' ? 'Weightment' : role}
                   </span>
                 </div>
               ))}
@@ -550,7 +597,7 @@ export default function RolePermissions() {
           </div>
 
           {/* Matrix Content Body Rows */}
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 overflow-y-auto max-h-[calc(100vh-200px)]">
             {Object.entries(groupedStructure).map(([category, actionsList]) => {
               const isExpanded = !!openCategories[category];
 
@@ -577,24 +624,27 @@ export default function RolePermissions() {
                           )}
                       </div>
                     </div>
-                    <div className="col-span-8 mt-4 md:mt-0 grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-0 items-center justify-items-center">
+                    <div className="col-span-8 mt-4 md:mt-0 grid grid-cols-4 md:grid-cols-8 gap-3 md:gap-0 items-center justify-items-center">
                       {roles.map(role => (
                         <div key={role} className="flex flex-col md:flex-row items-center gap-1">
                           <span className={`text-[10px] font-bold uppercase tracking-wider md:hidden ${roleColors[role].text}`}>
-                            {role === 'Depot Manager' ? 'Depot Mgr' : role}
+                            {role === 'Weightment' ? 'Weightment' : role}
                           </span>
-<PermissionToggle
-                             allowed={permissions[singleRawItem.rawKey]?.[role] ?? false}
-                             module={singleRawItem.rawKey}
-                             role={role}
-                             disabled={
-                               !isAdmin ||
-                                 role === 'Management'||
-                               role === 'Loader' ||
-                               isDependencyPermission(singleRawItem.rawKey, role)
-                             }
-                             isDependency={isDependencyPermission(singleRawItem.rawKey, role)}
-                           />
+                          <PermissionToggle
+                            allowed={permissions[singleRawItem.rawKey]?.[role] ?? false}
+                            module={singleRawItem.rawKey}
+                            role={role}
+                            disabled={
+                              !isAdmin ||
+                              role === 'Management' ||
+                              role === 'Loader' ||
+                              role === 'Weightment' ||
+                              role === 'Dispatch Verifier' ||
+
+                              isDependencyPermission(singleRawItem.rawKey, role)
+                            }
+                            isDependency={isDependencyPermission(singleRawItem.rawKey, role)}
+                          />
                         </div>
                       ))}
                     </div>
@@ -636,19 +686,26 @@ export default function RolePermissions() {
 
                     {/* Single-action rows rendered directly inline */}
                     {!hasMultipleActions && validActions.length === 1 && (
-                      <div className="col-span-8 mt-4 md:mt-0 grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-0 items-center justify-items-center">
+                      <div className="col-span-8 mt-4 md:mt-0 grid grid-cols-4 md:grid-cols-8 gap-3 md:gap-0 items-center justify-items-center">
                         {roles.map(role => (
                           <div key={role} className="flex flex-col md:flex-row items-center gap-1">
                             <span className={`text-[10px] font-bold uppercase tracking-wider md:hidden ${roleColors[role].text}`}>
-                              {role === 'Depot Manager' ? 'Depot Mgr' : role}
+                              {role === 'Weightment' ? 'Weightment' : role}
                             </span>
-<PermissionToggle
-                               allowed={permissions[validActions[0].rawKey]?.[role] ?? false}
-                               module={validActions[0].rawKey}
-                               role={role}
-                               disabled={!isAdmin || role === 'Management'   || role === 'Loader' || isDependencyPermission(validActions[0].rawKey, role)}
-                               isDependency={isDependencyPermission(validActions[0].rawKey, role)}
-                             />
+                            <PermissionToggle
+                              allowed={permissions[validActions[0].rawKey]?.[role] ?? false}
+                              module={validActions[0].rawKey}
+                              role={role}
+                              disabled={
+                                !isAdmin ||
+                                role === 'Management' ||
+                                role === 'Loader' ||
+                                role === 'Weightment' ||
+                                role === 'Dispatch Verifier' ||
+
+                                isDependencyPermission(validActions[0].rawKey, role)}
+                              isDependency={isDependencyPermission(validActions[0].rawKey, role)}
+                            />
                           </div>
                         ))}
                       </div>
@@ -656,7 +713,7 @@ export default function RolePermissions() {
 
                     {/* Pro Feature: Summary view rendered inside cells when a group is COLLAPSED */}
                     {hasMultipleActions && !isExpanded && (
-                      <div className="col-span-8 mt-4 md:mt-0 grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-0 items-center justify-items-center animate-fadeIn">
+                      <div className="col-span-8 mt-4 md:mt-0 grid grid-cols-4 md:grid-cols-8 gap-3 md:gap-0 items-center justify-items-center animate-fadeIn">
                         {roles.map(role => {
                           const total = validActions.length;
                           const allowedCount = validActions.filter(({ rawKey }) => permissions[rawKey]?.[role]).length;
@@ -664,7 +721,7 @@ export default function RolePermissions() {
                           return (
                             <div key={role} className="flex flex-col items-center justify-center">
                               <span className={`text-[10px] font-bold uppercase tracking-wider md:hidden mb-1 ${roleColors[role].text}`}>
-                                {role === 'Depot Manager' ? 'Depot Mgr' : role}
+                                {role === 'Weightment' ? 'Weightment' : role}
                               </span>
 
                               {/* Compact Mini Dashboard Badge per Role Cell */}
@@ -710,19 +767,19 @@ export default function RolePermissions() {
                               {meta.icon}
                               <span>{meta.label}</span>
                             </div>
-                            <div className="col-span-8 mt-2 md:mt-0 grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-0 items-center justify-items-center">
+                            <div className="col-span-8 mt-2 md:mt-0 grid grid-cols-4 md:grid-cols-8 gap-3 md:gap-0 items-center justify-items-center">
                               {roles.map(role => (
                                 <div key={role} className="flex flex-col md:flex-row items-center gap-1">
                                   <span className={`text-[10px] font-bold uppercase tracking-wider md:hidden ${roleColors[role].text}`}>
-                                    {role === 'Depot Manager' ? 'Depot Mgr' : role}
+                                    {role === 'Weightment' ? 'Weightment' : role}
                                   </span>
-<PermissionToggle
-                                     allowed={permissions[rawKey]?.[role] ?? false}
-                                     module={rawKey}
-                                     role={role}
-                                     disabled={!isAdmin || role === 'Management' || role === 'Loader' || isDependencyPermission(rawKey, role)}
-                                     isDependency={isDependencyPermission(rawKey, role)}
-                                   />
+                                  <PermissionToggle
+                                    allowed={permissions[rawKey]?.[role] ?? false}
+                                    module={rawKey}
+                                    role={role}
+                                    disabled={!isAdmin || role === 'Management' || role === 'Loader' || role === 'Weightment' || role === 'Dispatch Verifier' || isDependencyPermission(rawKey, role)}
+                                    isDependency={isDependencyPermission(rawKey, role)}
+                                  />
                                 </div>
                               ))}
                             </div>

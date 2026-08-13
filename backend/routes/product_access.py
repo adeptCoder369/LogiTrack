@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from pydantic import BaseModel
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user, get_user_product_ids
 
 router = APIRouter(tags=["Product Access"])
@@ -243,7 +243,12 @@ async def revoke_product_access_from_users(
     admin_product_ids = await get_user_product_ids(current_user)
     if admin_product_ids is not None and product_id not in admin_product_ids:
         raise HTTPException(status_code=403, detail="You don't have access to manage this product")
-    
+
+    # Validate product exists
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
     # Revoke access for each user.
     # If the product is role-assigned and the user has the same role, record an exclusion.
     updated_count = 0

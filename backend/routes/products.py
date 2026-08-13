@@ -2,7 +2,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
-from database import db
+# from db_compat import db
+from .db_compat import db
+
 from models import Product, ProductCreate
 from auth_utils import get_current_user, get_user_product_ids, check_permission
 

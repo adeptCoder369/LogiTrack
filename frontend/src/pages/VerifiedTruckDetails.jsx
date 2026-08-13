@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,
   ChevronUp,
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 import { VerifiedTruckDetailsDataTable } from '@/components/verifiedTruckDetails/DataTable';
 import VerifiedTruckDetailsFilterPanel from '@/components/verifiedTruckDetails/FilterPanel';
 import { usePermissions } from '../lib/permissions';
+import { getExistingFileId } from '@/components/verifiedTruckDetails/fileUtils';
 
 export default function VerifiedTruckDetails() {
   const { hasPermission, hasActionPermission } = usePermissions();
@@ -38,7 +40,7 @@ export default function VerifiedTruckDetails() {
     const to = new Date();
     const from = new Date();
     from.setMonth(from.getMonth() - 2);
-    const fmt = (d) => d.toISOString().slice(0,10);
+    const fmt = (d) => d.toISOString().slice(0, 10);
     return { dateFrom: fmt(from), dateTo: fmt(to) };
   })();
 
@@ -69,29 +71,29 @@ export default function VerifiedTruckDetails() {
 
   const [forms, setForms] = useState({});
 
-  // Fetch verified trucks
-  const fetchTrucks = async () => {
-    setLoading(true);
-    try {
-      const params = {
-        page,
-        page_size: pageSize
-      };
+  const queryClient = useQueryClient();
 
-      if (filters.truckNo) params.truck_no = filters.truckNo;
-      if (filters.transporter) params.transporter = filters.transporter;
-      if (filters.driverMobile) params.driver_mobile = filters.driverMobile;
-      if (filters.company) params.company = filters.company;
-      if (filters.poNumber) params.po_number = filters.poNumber;
-      if (filters.dateFrom) params.start_date = filters.dateFrom;
-      if (filters.dateTo) params.end_date = filters.dateTo;
-      if (filters.verifiedBy) params.verified_by = filters.verifiedBy;
-      if (filters.invoiceNo) params.invoice_no = filters.invoiceNo;
-      if (filters.shippingNo) params.shipping_no = filters.shippingNo;
-      if (filters.packingListNo) params.packing_list_no = filters.packingListNo;
+  const buildParams = () => {
+    const params = { page, page_size: pageSize };
+    if (filters.truckNo) params.truck_no = filters.truckNo;
+    if (filters.transporter) params.transporter = filters.transporter;
+    if (filters.driverMobile) params.driver_mobile = filters.driverMobile;
+    if (filters.company) params.company = filters.company;
+    if (filters.poNumber) params.po_number = filters.poNumber;
+    if (filters.dateFrom) params.start_date = filters.dateFrom;
+    if (filters.dateTo) params.end_date = filters.dateTo;
+    if (filters.verifiedBy) params.verified_by = filters.verifiedBy;
+    if (filters.invoiceNo) params.invoice_no = filters.invoiceNo;
+    if (filters.shippingNo) params.shipping_no = filters.shippingNo;
+    if (filters.packingListNo) params.packing_list_no = filters.packingListNo;
+    return params;
+  };
 
+  const { data: fetchedTrucks = [], isLoading } = useQuery({
+    queryKey: ['verifiedTrucks', page, filters],
+    queryFn: async () => {
+      const params = buildParams();
       const res = await verifiedTrucksApi.getAll(params);
-      console.log('Fetched trucks:', res.data);
       let data = Array.isArray(res.data) ? res.data : [];
 
       // Client-side filtering for invoice/shipping uploads
@@ -107,37 +109,31 @@ export default function VerifiedTruckDetails() {
 
       // Client-side filtering for PO/Invoice/Shipping dates and amounts
       data = data.filter(truck => {
-        // PO Date (compare YYYY-MM-DD)
         if (filters.poDate) {
-          const t = truck.po_date ? (new Date(truck.po_date).toISOString().slice(0,10)) : '';
+          const t = truck.po_date ? (new Date(truck.po_date).toISOString().slice(0, 10)) : '';
           if (t !== filters.poDate) return false;
         }
 
-        // Invoice Date
         if (filters.invoiceDate) {
-          const t = truck.invoice_details?.invoice_date ? (new Date(truck.invoice_details.invoice_date).toISOString().slice(0,10)) : '';
+          const t = truck.invoice_details?.invoice_date ? (new Date(truck.invoice_details.invoice_date).toISOString().slice(0, 10)) : '';
           if (t !== filters.invoiceDate) return false;
         }
 
-        // Shipping Date
         if (filters.shippingDate) {
-          const t = truck.shipping_details?.shipping_date ? (new Date(truck.shipping_details.shipping_date).toISOString().slice(0,10)) : '';
+          const t = truck.shipping_details?.shipping_date ? (new Date(truck.shipping_details.shipping_date).toISOString().slice(0, 10)) : '';
           if (t !== filters.shippingDate) return false;
         }
 
-        // Packing List Date
         if (filters.packingListDate) {
-          const t = truck.packing_list_details?.packing_list_date ? (new Date(truck.packing_list_details.packing_list_date).toISOString().slice(0,10)) : '';
+          const t = truck.packing_list_details?.packing_list_date ? (new Date(truck.packing_list_details.packing_list_date).toISOString().slice(0, 10)) : '';
           if (t !== filters.packingListDate) return false;
         }
 
-        // Invoice Amount (exact match)
         if (filters.invoiceAmount) {
           const amt = truck.invoice_details?.invoice_amount != null ? Number(truck.invoice_details.invoice_amount) : null;
           if (amt === null || amt !== Number(filters.invoiceAmount)) return false;
         }
 
-        // Shipping Amount (exact match)
         if (filters.shippingAmount) {
           const amt = truck.shipping_details?.shipping_bill_amount != null ? Number(truck.shipping_details.shipping_bill_amount) : null;
           if (amt === null || amt !== Number(filters.shippingAmount)) return false;
@@ -146,93 +142,90 @@ export default function VerifiedTruckDetails() {
         return true;
       });
 
-      setTrucks(data);
-      setTotalPages(Math.ceil(data.length / pageSize) || 1);
-    } catch (err) {
-      toast.error('Failed to load verified trucks');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data;
+    },
+    keepPreviousData: true
+  });
 
   useEffect(() => {
-    fetchTrucks();
-  }, [page, filters]);
+    setLoading(isLoading);
+  }, [isLoading]);
+
+  useEffect(() => {
+    setTrucks(fetchedTrucks);
+    setTotalPages(Math.ceil(fetchedTrucks.length / pageSize) || 1);
+  }, [fetchedTrucks]);
 
   // When an invoice or shipping form is opened, prefill the corresponding form
   // with existing truck data if available so users see previous values when editing.
   useEffect(() => {
-    // Prefill invoice forms
+    // Prefill invoice forms only when there is existing data to restore.
     Object.entries(showInvoiceForm).forEach(([id, open]) => {
       const key = `invoice_${id}`;
-      if (open && (!forms[key] || Object.keys(forms[key]).length === 0)) {
-        const truck = trucks.find(t => String(t.id) === String(id));
-        if (truck && truck.invoice_details) {
-          const d = truck.invoice_details;
-          setForms(prev => ({
-            ...prev,
-            [key]: {
-              invoiceNo: d.invoice_no || '',
-              invoiceDate: d.invoice_date || '',
-              comments: d.comments || '',
-              file: null,
-              fileName: d.file_id || d.fileId || '',
-              invoiceAmount: d.invoice_amount || d.invoiceAmount || '',
-              currency: d.currency || 'INR'
-            }
-          }));
-        } else {
-          setForms(prev => ({ ...prev, [key]: {} }));
-        }
+      if (!open || (forms[key] && Object.keys(forms[key]).length > 0)) return;
+
+      const truck = trucks.find(t => String(t.id) === String(id));
+      if (truck?.invoice_details) {
+        const d = truck.invoice_details;
+        setForms(prev => ({
+          ...prev,
+          [key]: {
+            invoiceNo: d.invoice_no || '',
+            invoiceDate: d.invoice_date || '',
+            comments: d.comments || '',
+            file: null,
+            file_id: d.file_id || d.fileId || null,
+            fileName: d.file_id || d.fileId || '',
+            invoiceAmount: d.invoice_amount || d.invoiceAmount || '',
+            currency: d.currency || 'INR'
+          }
+        }));
       }
     });
 
-    // Prefill shipping forms
+    // Prefill shipping forms only when there is existing data to restore.
     Object.entries(showShippingForm).forEach(([id, open]) => {
       const key = `shipping_${id}`;
-      if (open && (!forms[key] || Object.keys(forms[key]).length === 0)) {
-        const truck = trucks.find(t => String(t.id) === String(id));
-        if (truck && truck.shipping_details) {
-          const d = truck.shipping_details;
-          setForms(prev => ({
-            ...prev,
-            [key]: {
-              shippingNo: d.shipping_no || '',
-              shippingDate: d.shipping_date || '',
-              comments: d.comments || '',
-              file: null,
-              fileName: d.file_id || d.fileId || '',
-              shippingBillAmount: d.shipping_bill_amount || d.shippingBillAmount || '',
-              currency: d.currency || 'INR'
-            }
-          }));
-        } else {
-          setForms(prev => ({ ...prev, [key]: {} }));
-        }
+      if (!open || (forms[key] && Object.keys(forms[key]).length > 0)) return;
+
+      const truck = trucks.find(t => String(t.id) === String(id));
+      if (truck?.shipping_details) {
+        const d = truck.shipping_details;
+        setForms(prev => ({
+          ...prev,
+          [key]: {
+            shippingNo: d.shipping_no || '',
+            shippingDate: d.shipping_date || '',
+            comments: d.comments || '',
+            file: null,
+            file_id: d.file_id || d.fileId || null,
+            fileName: d.file_id || d.fileId || '',
+            shippingBillAmount: d.shipping_bill_amount || d.shippingBillAmount || '',
+            currency: d.currency || 'INR'
+          }
+        }));
       }
     });
 
-    // Prefill packing list forms
+    // Prefill packing list forms only when there is existing data to restore.
     Object.entries(showPackingListForm).forEach(([id, open]) => {
       const key = `packingList_${id}`;
-      if (open && (!forms[key] || Object.keys(forms[key]).length === 0)) {
-        const truck = trucks.find(t => String(t.id) === String(id));
-        if (truck && truck.packing_list_details) {
-          const d = truck.packing_list_details;
-          setForms(prev => ({
-            ...prev,
-            [key]: {
-              packingListNo: d.packing_list_no || '',
-              packingListDate: d.packing_list_date || '',
-              remarks: d.remarks || '',
-              file: null,
-              fileName: d.file_id || d.fileId || ''
-            }
-          }));
-        } else {
-          setForms(prev => ({ ...prev, [key]: {} }));
-        }
+      if (!open || (forms[key] && Object.keys(forms[key]).length > 0)) return;
+
+      const truck = trucks.find(t => String(t.id) === String(id));
+      if (truck?.packing_list_details) {
+        const d = truck.packing_list_details;
+        setForms(prev => ({
+          ...prev,
+          [key]: {
+            packingListNo: d.packing_list_no || '',
+            packingListDate: d.packing_list_date || '',
+            remarks: d.remarks || '',
+            file: null,
+            file_id: d.file_id || d.fileId || null,
+            fileName: d.file_id || d.fileId || ''
+          }
+        }));
       }
     });
   }, [showInvoiceForm, showShippingForm, showPackingListForm, trucks, forms]);
@@ -252,7 +245,7 @@ export default function VerifiedTruckDetails() {
     }
 
     try {
-      let fileId = null;
+      let fileId = getExistingFileId(form);
       if (form.file) {
         const uploadRes = await uploadFile(form.file);
         fileId = uploadRes.file_id || uploadRes.fileId || uploadRes;
@@ -275,7 +268,8 @@ export default function VerifiedTruckDetails() {
       toast.success('Invoice saved');
       setShowInvoiceForm(prev => ({ ...prev, [truckId]: false }));
       setForms(prev => ({ ...prev, [`invoice_${truckId}`]: {} }));
-      fetchTrucks();
+      // Refresh via react-query
+      queryClient.invalidateQueries({ queryKey: ['verifiedTrucks'] });
     } catch (err) {
       toast.error('Failed to save invoice');
     }
@@ -289,7 +283,7 @@ export default function VerifiedTruckDetails() {
     }
 
     try {
-      let fileId = null;
+      let fileId = getExistingFileId(form);
       if (form.file) {
         const uploadRes = await uploadFile(form.file);
         fileId = uploadRes.file_id || uploadRes.fileId || uploadRes;
@@ -312,7 +306,8 @@ export default function VerifiedTruckDetails() {
       toast.success('Shipping details saved');
       setShowShippingForm(prev => ({ ...prev, [truckId]: false }));
       setForms(prev => ({ ...prev, [`shipping_${truckId}`]: {} }));
-      fetchTrucks();
+      // Refresh via react-query
+      queryClient.invalidateQueries({ queryKey: ['verifiedTrucks'] });
     } catch (err) {
       toast.error('Failed to save shipping details');
     }
@@ -326,7 +321,7 @@ export default function VerifiedTruckDetails() {
     }
 
     try {
-      let fileId = null;
+      let fileId = getExistingFileId(form);
       if (form.file) {
         const uploadRes = await uploadFile(form.file);
         fileId = uploadRes.file_id || uploadRes.fileId || uploadRes;
@@ -347,7 +342,8 @@ export default function VerifiedTruckDetails() {
       toast.success('Packing List saved');
       setShowPackingListForm(prev => ({ ...prev, [truckId]: false }));
       setForms(prev => ({ ...prev, [`packingList_${truckId}`]: {} }));
-      fetchTrucks();
+      // Refresh via react-query
+      queryClient.invalidateQueries({ queryKey: ['verifiedTrucks'] });
     } catch (err) {
       toast.error('Failed to save packing list');
     }
@@ -372,11 +368,11 @@ export default function VerifiedTruckDetails() {
 
   return (
     <PageLayout title="Verified Dispatch Details" subtitle="Verified weightment slips with invoice & shipping records">
-    
 
 
 
-      <VerifiedTruckDetailsFilterPanel 
+
+      <VerifiedTruckDetailsFilterPanel
         filters={filters}
         setFilters={setFilters}
         setPage={setPage}
@@ -404,7 +400,7 @@ export default function VerifiedTruckDetails() {
         handleInvoiceSubmit={handleInvoiceSubmit}
         handleShippingSubmit={handleShippingSubmit}
         handlePackingListSubmit={handlePackingListSubmit}
- 
+
         emptyMessage="No verified trucks found"
       />
     </PageLayout>

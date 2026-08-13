@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import io
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user, require_permission
 
 router = APIRouter(tags=["Reports"])
@@ -78,9 +78,37 @@ async def get_datewise_lifting_report(
 
     # Get liftings with pagination
     liftings = await db.liftings.find(query, {"_id": 0}).sort("date_of_loading", -1).skip(skip).limit(page_size).to_list(page_size)
-
-    # Add verified pickups as stock movement rows so reports match inventory ledger
-    pickups = await db.pickups.find(pickup_query, {"_id": 0}).sort("verified_at", -1).to_list(1000)
+    
+    # Get verified pickups that don't have a corresponding lifting yet (avoid duplication with Secondary liftings)
+    pickup_query = {"status": {"$in": ["verified", "weightment_done", "final_verified"]}}
+    if date_from or date_to:
+        pickup_date_query = {}
+        if date_from:
+            pickup_date_query["$gte"] = date_from
+        if date_to:
+            pickup_date_query["$lte"] = date_to + "T23:59:59"
+        if pickup_date_query:
+            pickup_query["verified_at"] = pickup_date_query
+    if product_id:
+        pickup_query["product_id"] = product_id
+    if depot_id:
+        pickup_query["depot_id"] = depot_id
+    
+    # Get all pickups first
+    all_pickups = await db.pickups.find(pickup_query, {"_id": 0}).sort("verified_at", -1).to_list(1000)
+    
+    # Get set of pickup IDs that have corresponding liftings (Secondary type)
+    pickup_ids_with_lifting = set()
+    for pickup in all_pickups:
+        existing_lifting = await db.liftings.find_one({
+            "purchase_order_id": pickup.get("purchase_order_id"),
+            "vehicle_number": pickup.get("truck_number")
+        })
+        if existing_lifting:
+            pickup_ids_with_lifting.add(pickup.get("id"))
+    
+    # Filter out pickups that already have liftings
+    pickups = [p for p in all_pickups if p.get("id") not in pickup_ids_with_lifting]
     for pickup in pickups:
         liftings.append({
             **pickup,
@@ -224,8 +252,20 @@ async def export_datewise_lifting_report(
             pickup_query["product_id"] = product_id
         if depot_id:
             pickup_query["depot_id"] = depot_id
-
-        pickups = await db.pickups.find(pickup_query, {"_id": 0}).sort("verified_at", -1).to_list(1000)
+        
+        # Get all pickups first
+        all_pickups = await db.pickups.find(pickup_query, {"_id": 0}).sort("verified_at", -1).to_list(1000)
+        
+        # Filter out pickups that have corresponding liftings (Secondary type)
+        pickups = []
+        for pickup in all_pickups:
+            existing_lifting = await db.liftings.find_one({
+                "purchase_order_id": pickup.get("purchase_order_id"),
+                "vehicle_number": pickup.get("truck_number")
+            })
+            if not existing_lifting:
+                pickups.append(pickup)
+        
         pickup_records = []
         for pickup in pickups:
             pickup_records.append({

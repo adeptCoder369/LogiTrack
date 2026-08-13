@@ -1,8 +1,9 @@
 """Company and Company Users routes"""
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
+from .db_compat import db
 
-from database import db
+# from database import db
 from auth_utils import get_current_user, check_permission
 from models import (
     Company, CompanyCreate,

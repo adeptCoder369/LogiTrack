@@ -14,6 +14,7 @@ import { deliveryOrdersApi, productsApi, companiesApi, depotsApi, railwaySidings
 import { useAuth } from '../lib/auth';
 import { validators } from '../lib/validation';
 import { usePermissions } from '../lib/permissions';
+import { formatIndianNumber } from '../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Download, Truck, Train, Filter, X, Search, ClipboardList, Package, TrendingUp, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { DeliveryOrdersDataTable } from '@/components/deliveryOrders/DataTable';
@@ -217,22 +218,36 @@ export default function DeliveryOrders() {
       label: 'Destination',
       render: (v, row) => {
         const destType = row.destination_type || 'Depot';
+        const typeColor = destType === 'Company'
+          ? 'bg-purple-100 text-purple-700 border-purple-200'
+          : destType === 'Both'
+            ? 'bg-blue-100 text-blue-700 border-blue-200'
+            : 'bg-slate-100 text-slate-700 border-slate-200';
+        let nameDisplay;
         if (destType === 'Depot') {
-          return row.to_depot_name || '-';
+          nameDisplay = row.to_depot_name || '-';
         } else if (destType === 'Company') {
-          return row.to_company_name || '-';
+          nameDisplay = row.to_company_name || '-';
         } else {
-          return (
-            <div className="text-xs">
+          nameDisplay = (
+            <div className="text-xs space-y-0.5">
               <div>Depot: {row.to_depot_name || '-'}</div>
               <div className="text-gray-500">Company: {row.to_company_name || '-'}</div>
             </div>
           );
         }
+        return (
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">{nameDisplay}</span>
+            <span className={`inline-flex self-start text-[10px] font-semibold px-1.5 py-0.5 rounded border ${typeColor}`}>
+              {destType}
+            </span>
+          </div>
+        );
       }
     },
     { key: 'product_name', label: 'Product' },
-    { key: 'total_quantity_mt', label: 'Total Qty', render: (v) => <span className="font-medium">{v} MT</span> },
+    { key: 'total_quantity_mt', label: 'Total Qty', render: (v) => <span className="font-medium">{formatIndianNumber(v)} MT</span> },
     // { key: 'lifted_quantity_mt', label: 'Lifted', render: (v) => <span className="text-green-600">{v || 0} MT</span> },
     // { key: 'remaining_quantity_mt', label: 'Remaining', render: (v) => <span className="text-orange-600">{v || 0} MT</span> },
 
@@ -268,7 +283,7 @@ export default function DeliveryOrders() {
           <div className="w-full max-w-[160px] min-w-[120px] py-1">
             {/* Label breakdown */}
             <div className="flex justify-between items-end text-[11px] mb-1 text-gray-500 font-medium">
-              <span>{lifted.toFixed(1)} / {total.toFixed(1)} MT</span>
+              <span>{formatIndianNumber(lifted)} / {formatIndianNumber(total)} MT</span>
               {/* Displays actual percentage, even if over 100% */}
               <span className={`font-semibold text-xs ${isExceeded ? 'text-red-600' : 'text-gray-700'}`}>
                 {percentage}%
@@ -288,7 +303,7 @@ export default function DeliveryOrders() {
               {isExceeded ? (
                 <span className="text-red-600 font-semibold">Lifting Exceeded</span>
               ) : remaining > 0 ? (
-                <span className="text-orange-600">{remaining.toFixed(1)} MT remaining</span>
+                <span className="text-orange-600">{formatIndianNumber(remaining)} MT remaining</span>
               ) : (
                 <span className="text-emerald-600">Fully Lifted</span>
               )}
@@ -560,8 +575,8 @@ export default function DeliveryOrders() {
   const companyPending = primaryCompanyFromDOs.filter(l => l.unloading_status === 'Pending').reduce((sum, l) => sum + (l.quantity_mt || 0), 0);
   const companyRejected = primaryCompanyFromDOs.filter(l => l.unloading_status === 'Rejected').reduce((sum, l) => sum + (l.quantity_mt || 0), 0);
 
-  const depotSumFromDOs = primaryDepotFromDOs.reduce((sum, l) => sum + (l.quantity_mt || 0), 0);
-  const companySumFromDOs = primaryCompanyFromDOs.reduce((sum, l) => sum + (l.quantity_mt || 0), 0);
+  const depotSumFromDOs = depotVerified + depotPending;
+  const companySumFromDOs = companyVerified + companyPending;
 
   const canCreateDO = hasPermission('Delivery Orders (Create)');
   const canDeleteDO = hasPermission('Delivery Orders (Delete)');
@@ -753,7 +768,7 @@ export default function DeliveryOrders() {
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Total DO Quantity</p>
                 <p className="text-3xl font-bold text-slate-900" style={{ fontFamily: 'Manrope' }}>
-                  {filteredOrders.reduce((sum, o) => sum + (o.total_quantity_mt || 0), 0).toFixed(2)}
+                  {formatIndianNumber(filteredOrders.reduce((sum, o) => sum + (o.total_quantity_mt || 0), 0))}
                   <span className="text-sm font-normal text-gray-400 ml-1">MT</span>
                 </p>
               </div>
@@ -780,7 +795,7 @@ export default function DeliveryOrders() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-500 font-medium">
-                        {totalLifted.toFixed(2)} / {totalQty.toFixed(2)} MT
+                        {formatIndianNumber(totalLifted)} / {formatIndianNumber(totalQty)} MT
                       </span>
                       <span className={`font-bold ${isExceeded ? 'text-red-600' : 'text-slate-700'}`}>
                         {Math.round(rawPercentage)}%
@@ -803,7 +818,7 @@ export default function DeliveryOrders() {
                       ) : displayPercentage === 100 ? (
                         <span className="text-green-600 font-medium">Fully Dispatched</span>
                       ) : (
-                        <span className="text-orange-600 font-medium">{totalRemaining.toFixed(2)} MT remaining</span>
+                        <span className="text-orange-600 font-medium">{formatIndianNumber(totalRemaining)} MT remaining</span>
                       )}
                     </div>
                   </div>
@@ -841,7 +856,7 @@ export default function DeliveryOrders() {
                               {product.product_name}
                             </span>
                             <span className="text-gray-500 font-mono text-xs">
-                              {lifted.toFixed(1)}/{total.toFixed(1)} MT
+                              {formatIndianNumber(lifted)}/{formatIndianNumber(total)} MT
                             </span>
                           </div>
 
@@ -863,7 +878,7 @@ export default function DeliveryOrders() {
                             ) : displayProductPercentage === 100 ? (
                               <span className="text-green-600 font-medium">Done</span>
                             ) : (
-                              <span className="text-gray-400">{remaining.toFixed(1)} MT left</span>
+                              <span className="text-gray-400">{formatIndianNumber(remaining)} MT left</span>
                             )}
                           </div>
                         </div>
@@ -883,7 +898,7 @@ export default function DeliveryOrders() {
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">Total DO Quantity</p>
                 <p className="text-3xl font-bold text-slate-900" style={{ fontFamily: 'Manrope' }}>
-                  {filteredOrders.reduce((sum, o) => sum + (o.total_quantity_mt || 0), 0).toFixed(2)}
+                  {formatIndianNumber(filteredOrders.reduce((sum, o) => sum + (o.total_quantity_mt || 0), 0))}
                   <span className="text-sm font-normal text-gray-400 ml-1">MT</span>
                 </p>
               </div>
@@ -898,14 +913,14 @@ export default function DeliveryOrders() {
                 <div className="bg-green-50 rounded px-2 py-1.5">
                   <span className="text-gray-500">Lifted: </span>
                   <span className="font-semibold text-green-700">
-                    {filteredOrders.reduce((sum, o) => sum + (o.lifted_quantity_mt || 0), 0).toFixed(2)} MT
+                    {formatIndianNumber(filteredOrders.reduce((sum, o) => sum + (o.lifted_quantity_mt || 0), 0))} MT
                   </span>
                 </div>
 
                 <div className="bg-orange-50 rounded px-2 py-1.5">
                   <span className="text-gray-500">Remaining: </span>
                   <span className="font-semibold text-orange-700">
-                    {filteredOrders.reduce((sum, o) => sum + (o.remaining_quantity_mt || 0), 0).toFixed(2)} MT
+                    {formatIndianNumber(filteredOrders.reduce((sum, o) => sum + (o.remaining_quantity_mt || 0), 0))} MT
                   </span>
                 </div>
               </div>
@@ -951,17 +966,17 @@ export default function DeliveryOrders() {
                             </span>
 
                             <span className="text-[10px] text-gray-500">
-                              {total.toFixed(2)} MT
+                              {formatIndianNumber(total)} MT
                             </span>
                           </div>
 
                           <div className="grid grid-cols-2 gap-2 text-[10px]">
                             <div className="text-green-700 font-medium">
-                              Lifted: {lifted.toFixed(2)} MT
+                              Lifted: {formatIndianNumber(lifted)} MT
                             </div>
 
                             <div className="text-orange-700 font-medium text-right">
-                              Remaining: {remaining.toFixed(2)} MT
+                              Remaining: {formatIndianNumber(remaining)} MT
                             </div>
                           </div>
                         </div>
@@ -1011,13 +1026,13 @@ export default function DeliveryOrders() {
                 <div className="bg-blue-50 rounded px-2 py-1">
                   <span className="text-gray-500">Co.→Depot: </span>
                   <span className="font-semibold text-blue-700">
-                    {depotSumFromDOs.toFixed(2)} MT
+                    {formatIndianNumber(depotSumFromDOs)} MT
                   </span>
                 </div>
                 <div className="bg-green-50 rounded px-2 py-1">
                   <span className="text-gray-500">Co.→Client: </span>
                   <span className="font-semibold text-green-700">
-                    {companySumFromDOs.toFixed(2)} MT
+                    {formatIndianNumber(companySumFromDOs)} MT
                   </span>
                 </div>
               </div>
@@ -1030,15 +1045,15 @@ export default function DeliveryOrders() {
                     <div className="grid grid-cols-3 gap-1 text-xs">
                       <div className="bg-green-50 rounded px-1.5 py-0.5">
                         <span className="text-green-700">Verified: </span>
-                        <span className="font-bold text-green-800">{depotVerified.toFixed(1)} MT</span>
+                        <span className="font-bold text-green-800">{formatIndianNumber(depotVerified)} MT</span>
                       </div>
                       <div className="bg-yellow-50 rounded px-1.5 py-0.5">
                         <span className="text-yellow-700">Pending: </span>
-                        <span className="font-bold text-yellow-800">{depotPending.toFixed(1)} MT</span>
+                        <span className="font-bold text-yellow-800">{formatIndianNumber(depotPending)} MT</span>
                       </div>
                       <div className="bg-red-50 rounded px-1.5 py-0.5">
                         <span className="text-red-700">Rejected: </span>
-                        <span className="font-bold text-red-800">{depotRejected.toFixed(1)} MT</span>
+                        <span className="font-bold text-red-800">{formatIndianNumber(depotRejected)} MT</span>
                       </div>
                     </div>
 
@@ -1046,15 +1061,15 @@ export default function DeliveryOrders() {
                     <div className="grid grid-cols-3 gap-1 text-xs">
                       <div className="bg-green-50 rounded px-1.5 py-0.5">
                         <span className="text-green-700">Verified: </span>
-                        <span className="font-bold text-green-800">{companyVerified.toFixed(1)} MT</span>
+                        <span className="font-bold text-green-800">{formatIndianNumber(companyVerified)} MT</span>
                       </div>
                       <div className="bg-yellow-50 rounded px-1.5 py-0.5">
                         <span className="text-yellow-700">Pending: </span>
-                        <span className="font-bold text-yellow-800">{companyPending.toFixed(1)} MT</span>
+                        <span className="font-bold text-yellow-800">{formatIndianNumber(companyPending)} MT</span>
                       </div>
                       <div className="bg-red-50 rounded px-1.5 py-0.5">
                         <span className="text-red-700">Rejected: </span>
-                        <span className="font-bold text-red-800">{companyRejected.toFixed(1)} MT</span>
+                        <span className="font-bold text-red-800">{formatIndianNumber(companyRejected)} MT</span>
                       </div>
                     </div>
                   </div>
@@ -1164,11 +1179,24 @@ export default function DeliveryOrders() {
                             className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${formData.from_company_id === company.id ? 'bg-blue-100' : ''
                               }`}
                           >
-                            <p className="font-medium text-sm">{company.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {[company.city, company.state].filter(Boolean).join(', ')}
-                              {company.gst_number && ` • GST: ${company.gst_number}`}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              {company.logo_file_id ? (
+                                <img
+                                  src={getFileUrl(company.logo_file_id)}
+                                  alt={company.name}
+                                  className="w-6 h-6 rounded-full object-cover shrink-0"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 shrink-0" />
+                              )}
+                              <div>
+                                <p className="font-medium text-sm">{company.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {[company.city, company.state].filter(Boolean).join(', ')}
+                                  {company.gst_number && ` • GST: ${company.gst_number}`}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         ))}
                         {filteredCompanies.length > 50 && (
@@ -1199,12 +1227,22 @@ export default function DeliveryOrders() {
               </div>
 
               {/* Selected company info */}
-              {formData.from_company_id && (
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" />
-                  Selected: <span className="font-medium">{formData.from_company_name}</span>
-                </p>
-              )}
+              {formData.from_company_id && (() => {
+                const selectedCompany = companies.find((c) => c.id === formData.from_company_id);
+                return (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Selected: {selectedCompany?.logo_file_id && (
+                      <img
+                        src={getFileUrl(selectedCompany.logo_file_id)}
+                        alt={formData.from_company_name}
+                        className="w-4 h-4 rounded-full object-cover"
+                      />
+                    )}
+                    <span className="font-medium">{formData.from_company_name}</span>
+                  </p>
+                );
+              })()}
             </div>
 
             <div className="col-span-2">
@@ -1236,89 +1274,86 @@ export default function DeliveryOrders() {
               />
             </div>
 
-            {formData.transport_mode === 'Road' && (
-              <div className="col-span-2 space-y-3">
-                <div>
-                  <Label>Destination Type *</Label>
-                  <Select value={formData.destination_type} onValueChange={(v) => setFormData({ ...formData, destination_type: v, to_depot_id: '', to_depot_name: '', to_company_id: '', to_company_name: '' })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select destination type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="." className="text-sm font-medium text-slate-500 italic">
-                        All Destination Types
-                      </SelectItem>
-                      <SelectItem value="Depot">To Depot</SelectItem>
-                      <SelectItem value="Company">To Company</SelectItem>
-                      <SelectItem value="Both">Both (Depot & Company)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+{formData.transport_mode === 'Road' && (
+               <div className="col-span-2 space-y-3">
+                 <div>
+                   <Label>Destination Type *</Label>
+                   <Select value={formData.destination_type} onValueChange={(v) => setFormData({ ...formData, destination_type: v, to_depot_id: '', to_depot_name: '', to_company_id: '', to_company_name: '' })}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select destination type" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="Depot">To Depot</SelectItem>
+                       <SelectItem value="Company">To Company</SelectItem>
+                       {/* <SelectItem value="Both">Both (Depot & Company)</SelectItem> */}
+                     </SelectContent>
+                   </Select>
+                 </div>
 
-{formData.destination_type === 'Depot' && (
-                  <div>
-                    <Label>To Depot (Destination) *</Label>
-                    <Select value={formData.to_depot_id} onValueChange={handleDepotChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select destination depot" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {depots.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                 {formData.destination_type === 'Depot' && (
+                   <div>
+                     <Label>To Depot (Destination) *</Label>
+                     <Select value={formData.to_depot_id} onValueChange={handleDepotChange}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Select destination depot" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {depots.map((d) => (
+                           <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                 )}
 
-                {formData.destination_type === 'Company' && (
-                  <div>
-                    <Label>To Company (Client) *</Label>
-                    <Select value={formData.to_company_id} onValueChange={handleDestinationCompanyChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select destination company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                 {formData.destination_type === 'Company' && (
+                   <div>
+                     <Label>To Company (Client) *</Label>
+                     <Select value={formData.to_company_id} onValueChange={handleDestinationCompanyChange}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Select destination company" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {companies.map((c) => (
+                           <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                 )}
 
-                {formData.destination_type === 'Both' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>To Depot *</Label>
-                      <Select value={formData.to_depot_id} onValueChange={handleDepotChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select depot" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {depots.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>To Company (Client) *</Label>
-                      <Select value={formData.to_company_id} onValueChange={handleDestinationCompanyChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select company" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {companies.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                 {formData.destination_type === 'Both' && (
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <Label>To Depot *</Label>
+                       <Select value={formData.to_depot_id} onValueChange={handleDepotChange}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Select depot" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {depots.map((d) => (
+                             <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                     </div>
+                     <div>
+                       <Label>To Company (Client) *</Label>
+                       <Select value={formData.to_company_id} onValueChange={handleDestinationCompanyChange}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Select company" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {companies.map((c) => (
+                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                     </div>
+                   </div>
+                 )}
+               </div>
+             )}
           </div>
 
           {/* Railway Siding Fields */}

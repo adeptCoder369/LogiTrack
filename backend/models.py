@@ -1,6 +1,6 @@
 """Pydantic models for the application"""
-from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Union
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Union, Any
 import uuid
 from datetime import datetime, timezone
 
@@ -11,7 +11,8 @@ class SendOTPRequest(BaseModel):
     country_code: str = "91"
     purpose: str = "registration"
     
-    @validator('mobile')
+    @field_validator('mobile')
+    @classmethod
     def validate_mobile(cls, v):
         v = ''.join(filter(str.isdigit, v))
         if len(v) != 10:
@@ -23,17 +24,6 @@ class VerifyOTPRequest(BaseModel):
     country_code: str = "91"
     otp_code: str
     purpose: str = "registration"
-
-class RegisterRequest(BaseModel):
-    name: str
-    mobile: str
-    country_code: str = "91"
-    password: str
-    role: str = "Loader"
-    email: Optional[str] = None
-    depot_id: Optional[str] = None
-    company_id: Optional[str] = None
-    otp_verified: bool = False
 
 class LoginWithPasswordRequest(BaseModel):
     mobile: str
@@ -74,15 +64,6 @@ class TokenResponse(BaseModel):
     token: str
     user: dict
 
-class UserRegister(BaseModel):
-    name: str
-    mobile: str
-    country_code: str = "91"
-    password: str
-    role: str
-    email: Optional[str] = None
-    depot_id: Optional[str] = None
-
 class UserLogin(BaseModel):
     mobile: str
     country_code: str = "91"
@@ -118,17 +99,22 @@ class CompanyBase(BaseModel):
     ifsc_code: Optional[str] = None
     contact_person_name: Optional[str] = None
     contact_person_mobile: Optional[str] = None
-    is_client: bool = False
     company_type: Optional[str] = "Client"
+    is_client: bool = False
 
 class CompanyCreate(CompanyBase):
     pass
 
 class Company(CompanyBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    added_on: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    added_on: Optional[str] = None
     added_by: Optional[str] = None
     users: List[dict] = []
+
+    @field_validator('users', mode='before')
+    @classmethod
+    def _coerce_users(cls, v):
+        return v if isinstance(v, list) else (v or [])
 
 class CompanyUserBase(BaseModel):
     name: str
@@ -168,7 +154,13 @@ class TransporterBase(BaseModel):
     address: Optional[str] = None
     gst_number: Optional[str] = None
     industry_type: Optional[str] = None
+    company_ids: List[str] = []  # Multiple company mappings
     users: List[dict] = []  # Multiple users under transporter
+
+    @field_validator('company_ids', 'users', mode='before')
+    @classmethod
+    def _coerce_lists(cls, v):
+        return v if isinstance(v, list) else (v or [])
 
 class TransporterCreate(TransporterBase):
     pass
@@ -182,13 +174,16 @@ class DriverInfo(BaseModel):
     mobile: Optional[str] = None
     is_primary: bool = False
 
+class DocumentFile(BaseModel):
+    front: Optional[str] = None
+    back: Optional[str] = None
+
 class TruckBase(BaseModel):
     vehicle_number: str
     transporter_id: Optional[str] = None
     transporter_name: Optional[str] = None
     capacity_mt: Optional[float] = None
     tare_weight_mt: Optional[float] = None
-    make_model: Optional[str] = None
     driver_name: Optional[str] = None
     driver_mobile: Optional[str] = None
     helper_name: Optional[str] = None
@@ -198,6 +193,34 @@ class TruckBase(BaseModel):
     front_photo: Optional[str] = None
     back_photo: Optional[str] = None
     photos: Optional[List[str]] = []
+    fitness_certificate: Optional[Any] = None
+    fitness_valid_upto: Optional[str] = None
+    insurance: Optional[Any] = None
+    insurance_valid_upto: Optional[str] = None
+    tax: Optional[Any] = None
+    tax_valid_upto: Optional[str] = None
+    pollution: Optional[Any] = None
+    pollution_valid_upto: Optional[str] = None
+    rc: Optional[Any] = None
+    permit_valid_upto: Optional[str] = None
+    registration_date: Optional[str] = None
+    m_parivaahan: Optional[str] = None
+    driver_license: Optional[Any] = None
+    driver_photo: Optional[str] = None
+    driver_aadhaar: Optional[Any] = None
+    helper1_name: Optional[str] = None
+    helper1_mobile: Optional[str] = None
+    helper1_aadhaar: Optional[Any] = None
+    helper1_photo: Optional[str] = None
+    helper2_name: Optional[str] = None
+    helper2_mobile: Optional[str] = None
+    helper2_aadhaar: Optional[Any] = None
+    helper2_photo: Optional[str] = None
+
+    @field_validator('drivers', 'photos', mode='before')
+    @classmethod
+    def _coerce_lists(cls, v):
+        return v if isinstance(v, list) else (v or [])
 
 class TruckCreate(TruckBase):
     pass
@@ -214,6 +237,11 @@ class ProductBase(BaseModel):
     category: Optional[str] = None
     hsn_code: Optional[str] = None
     assigned_roles: List[str] = []
+
+    @field_validator('assigned_roles', mode='before')
+    @classmethod
+    def _coerce_assigned_roles(cls, v):
+        return v if isinstance(v, list) else (v or [])
 
 class ProductCreate(ProductBase):
     pass
@@ -235,6 +263,11 @@ class DepotBase(BaseModel):
     # Assignment fields
     assigned_roles: List[str] = []
 
+    @field_validator('assigned_roles', mode='before')
+    @classmethod
+    def _coerce_assigned_roles(cls, v):
+        return v if isinstance(v, list) else (v or [])
+
 class DepotCreate(DepotBase):
     pass
 
@@ -245,7 +278,7 @@ class Depot(DepotBase):
 class DepotInventory(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     depot_id: str
-    company_id: str
+    company_id: Optional[str] = None
     depot_name: str
     product_id: str
     product_name: str
@@ -319,6 +352,9 @@ class VerifiedTruckBase(BaseModel):
     shipping_details: Optional[ShippingDetails] = None
     packing_list_added: bool = False
     packing_list_details: Optional[PackingListDetails] = None
+    source: Optional[str] = None
+    source_id: Optional[str] = None
+    source_type: Optional[str] = None
 
 
 class VerifiedTruckCreate(VerifiedTruckBase):
@@ -436,6 +472,7 @@ class LiftingBase(BaseModel):
     unloading_point_name: Optional[str] = None
     purchase_order_id: Optional[str] = None
     purchase_order_no: Optional[str] = None
+    pickup_id: Optional[str] = None
 
 class LiftingCreate(LiftingBase):
     pass
@@ -459,11 +496,9 @@ class VerifyUnloadRequest(BaseModel):
     time_of_unloading: str
 
 class PurchaseOrderBase(BaseModel):
-    source_type: Optional[str] = "Depot"
     depot_id: Optional[str] = None
     depot_name: Optional[str] = None
-    source_company_id: Optional[str] = None
-    source_company_name: Optional[str] = None
+    source_type: Optional[str] = "Depot"
     
     to_company_id: Optional[str] = None
     to_company_name: Optional[str] = None
@@ -501,12 +536,6 @@ class PurchaseOrder(PurchaseOrderBase):
     
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    def set_po_number(self, sequence_num: int):
-        if self.source_type == "Company":
-            self.po_number = f"PO-COMP-{str(sequence_num).zfill(6)}"
-        else:
-            self.po_number = f"PO-{str(sequence_num).zfill(6)}"
-
 class PickupBase(BaseModel):
     date: str
     truck_number: str
@@ -517,8 +546,9 @@ class PickupBase(BaseModel):
     company_name: Optional[str] = None
     estimated_weight_mt: Optional[float] = None
     driver_phone: Optional[str] = None
-    depot_id: Optional[str] = None
-    depot_name: Optional[str] = None
+    source_id: Optional[str] = None
+    source_name: Optional[str] = None
+    source_type: Optional[str] = "Depot"
     product_id: Optional[str] = None
     product_name: Optional[str] = None
     tare_slip_file_id: Optional[str] = None
@@ -544,6 +574,11 @@ class Pickup(PickupBase):
     purchase_order_no: Optional[str] = None
     purchase_order_company_name: Optional[str] = None
     purchase_order_date: Optional[str] = None
+    purchase_order_company_id: Optional[str] = None
+
+    # lifting
+    lifting_id: Optional[str] = None
+    lifting_no: Optional[str] = None
 
     # reschedule
     rescheduled_to: Optional[str] = None
@@ -557,12 +592,24 @@ class Pickup(PickupBase):
     verified_by_name: Optional[str] = None
     verified_at: Optional[str] = None
 
+    # rejection
+    rejected_by: Optional[str] = None
+    rejected_by_name: Optional[str] = None
+    rejected_at: Optional[str] = None
+    rejection_reason: Optional[str] = None
+
     weight_mt: Optional[float] = None
     weight_slips: List[str] = []
 
     # weightment (loaded weight + slip)
     loaded_weight_mt: Optional[float] = None
     weightment_slip_file_id: Optional[str] = None
+
+    # tare slip upload history
+    tare_slip_upload_history: List[dict] = []
+
+    # weightment slip upload history
+    weightment_slip_upload_history: List[dict] = []
 
     # final verification
     final_verified_by: Optional[str] = None

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { permissionsApi, productAccessApi, depotAccessApi } from './api';
 import { useAuth } from './auth';
+import { normalizeRoleName } from './roleUtils';
 
 const PermissionsContext = createContext(null);
 
@@ -36,6 +37,7 @@ const ROUTE_TO_PERMISSION = {
   '/company-reports': 'Company Reports',
   '/lifting-reports': 'Lifting Reports',
   '/purchase-orders': 'Purchase Orders (View)',
+  '/downloads': 'Downloads (View)',
 };
 
 // Map actions to permission keys
@@ -108,6 +110,11 @@ const ACTION_PERMISSIONS = {
   'update_purchase_order': 'Purchase Orders (Update)',
   'delete_purchase_order': 'Purchase Orders (Delete)',
 
+  // Downloads
+  'create_download': 'Downloads (Create)',
+  'update_download': 'Downloads (Update)',
+  'delete_download': 'Downloads (Delete)',
+
   // User Management
   'create_user': 'User Management (Create)',
   'update_user': 'User Management (Update)',
@@ -173,11 +180,12 @@ export const PermissionsProvider = ({ children }) => {
     
     // Management always has all permissions
     if (user.role === 'Management') return true;
-    
+
+    const normalizedRole = normalizeRoleName(user.role);
     const permissionKey = ROUTE_TO_PERMISSION[route];
     if (!permissionKey) return true; // If no permission mapping, allow by default
 
-    const allowed = permissions[permissionKey]?.[user.role] ?? false;
+    const allowed = permissions[permissionKey]?.[normalizedRole] ?? false;
 
     // For product/depot list routes also ensure the user has entity-level access
     if (route === '/products' || route === '/depots') {
@@ -215,11 +223,12 @@ export const PermissionsProvider = ({ children }) => {
     
     // Management always has all permissions
     if (user.role === 'Management') return true;
-    
+
+    const normalizedRole = normalizeRoleName(user.role);
     const permissionKey = ACTION_PERMISSIONS[action];
     if (!permissionKey) return true; // If no permission mapping, allow by default
     
-    return permissions[permissionKey]?.[user.role] ?? false;
+    return permissions[permissionKey]?.[normalizedRole] ?? false;
   };
 
   // Check permission by direct key (from permissions matrix)
@@ -229,8 +238,9 @@ export const PermissionsProvider = ({ children }) => {
     
     // Management always has all permissions
     if (user.role === 'Management') return true;
-    
-    return permissions[permissionKey]?.[user.role] ?? false;
+
+    const normalizedRole = normalizeRoleName(user.role);
+    return permissions[permissionKey]?.[normalizedRole] ?? false;
   };
 
   // Refresh permissions (useful after admin updates)

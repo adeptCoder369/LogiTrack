@@ -76,9 +76,11 @@ const webpackConfig = {
             maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
             navigateFallback: "/offline.html",
             navigateFallbackDenylist: [/\/api\//, /\/auth\//],
+            exclude: [/\.map$/, /^manifest\.webmanifest$/],
+            cleanupOutdatedCaches: true,
             runtimeCaching: [
               {
-                urlPattern: /^https:\/\/api\.infoeight\.com\/api\/.*$/,
+                urlPattern: /^https:\/\/(dashboard\.infoeight\.com|api\.infoeight\.com)\/api\/.*$/,
                 handler: "NetworkFirst",
                 options: {
                   cacheName: "api-cache",

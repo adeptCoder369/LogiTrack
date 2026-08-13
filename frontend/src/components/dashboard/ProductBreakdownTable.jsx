@@ -159,7 +159,7 @@ export default function ProductBreakdownTable({
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 920 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '100%' }}>
             <thead>
               <tr style={{ background: '#F8FAFF', borderBottom: '1px solid #E2E8F0' }}>
                 <th

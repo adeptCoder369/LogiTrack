@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { enqueueOfflineRequest, isMutation, isOnline } from './offline';
 
-// export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://logitrack-backend-00mt.onrender.com';
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ;
-const API_BASE = `${BACKEND_URL}/api`;
+export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://dashboard.infoeight.com/api';
+// export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://logitrack-backend-bdv4.onrender.com';
+// export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ;
+console.log('BACKEND_URL_______________________________:', BACKEND_URL);
+const API_BASE = `${BACKEND_URL}`;
+const DOWNLOAD_TOKEN_KEY = 'download_token';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -53,16 +56,40 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem(DOWNLOAD_TOKEN_KEY);
       window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
+// ---- Download token -------------------------------------------------------
+// The browser loads file and export URLs itself (<img src>, window.open) and
+// cannot attach an Authorization header, so those URLs carry a short-lived,
+// download-scoped token as ?t=. It is stored so the URL builders below can stay
+// synchronous; refreshDownloadToken() is called on login and on a timer.
+export const refreshDownloadToken = async () => {
+  if (!localStorage.getItem('token')) return null;
+  try {
+    const { data } = await api.post('/auth/download-token');
+    localStorage.setItem(DOWNLOAD_TOKEN_KEY, data.token);
+    return data.token;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const clearDownloadToken = () => localStorage.removeItem(DOWNLOAD_TOKEN_KEY);
+
+const withDownloadToken = (url) => {
+  const t = localStorage.getItem(DOWNLOAD_TOKEN_KEY);
+  if (!t) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}t=${encodeURIComponent(t)}`;
+};
+
 // Auth
 export const authApi = {
   login: (data) => api.post('/auth/login', data),
-  register: (data) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
   // OTP endpoints
   sendOtp: (data) => api.post('/otp/send', data),
@@ -98,7 +125,7 @@ export const companiesApi = {
   updateUser: (companyId, userId, data) => api.put(`/companies/${companyId}/users/${userId}`, data),
   deleteUser: (companyId, userId) => api.delete(`/companies/${companyId}/users/${userId}`),
 
-// Purchase Orders
+  // Purchase Orders
   getPurchaseOrders: (companyId) => api.get(`/companies/${companyId}/purchase-orders`),
 
 };
@@ -112,6 +139,7 @@ export const transportersApi = {
   delete: (id) => api.delete(`/transporters/${id}`),
   // User management
   getUsers: (transporterId) => api.get(`/transporters/${transporterId}/users`),
+  getSystemUsers: (transporterId) => api.get(`/transporters/${transporterId}/system-users`),
   addUser: (transporterId, userData) => api.post(`/transporters/${transporterId}/users`, userData),
   updateUser: (transporterId, userId, userData) => api.put(`/transporters/${transporterId}/users/${userId}`, userData),
   deleteUser: (transporterId, userId) => api.delete(`/transporters/${transporterId}/users/${userId}`),
@@ -126,6 +154,8 @@ export const trucksApi = {
   delete: (id) => api.delete(`/trucks/${id}`),
   addDriver: (truckId, driver) => api.post(`/trucks/${truckId}/drivers`, driver),
   removeDriver: (truckId, driverMobile) => api.delete(`/trucks/${truckId}/drivers/${driverMobile}`),
+  downloadDocuments: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-documents`),
+  downloadDocumentsChecklist: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-documents-checklist`),
 };
 
 // Railway Sidings
@@ -168,9 +198,9 @@ export const depotsApi = {
 export const depotInventoryApi = {
   getAll: () => api.get('/depot-inventory'),
   getByDepot: (depotId) => api.get(`/depot-inventory/${depotId}`),
-  getLedger: (depotId, productId, dateFrom, dateTo) => 
-    api.get(`/depot-inventory/ledger/${depotId}/${productId}`, { 
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined } 
+  getLedger: (depotId, productId, dateFrom, dateTo) =>
+    api.get(`/depot-inventory/ledger/${depotId}/${productId}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
     }),
 };
 
@@ -178,9 +208,9 @@ export const depotInventoryApi = {
 export const companyInventoryApi = {
   getAll: () => api.get('/company-inventory'),
   getByCompany: (companyId) => api.get(`/company-inventory/${companyId}`),
-  getLedger: (companyId, productId, dateFrom, dateTo) => 
-    api.get(`/company-inventory/ledger/${companyId}/${productId}`, { 
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined } 
+  getLedger: (companyId, productId, dateFrom, dateTo) =>
+    api.get(`/company-inventory/ledger/${companyId}/${productId}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
     }),
 };
 
@@ -206,15 +236,15 @@ export const liftingsApi = {
 
 // Export
 export const exportApi = {
-  liftings: (params) => `${API_BASE}/export/liftings?format=excel&${new URLSearchParams(params).toString()}`,
-  inventory: () => `${API_BASE}/export/inventory?format=excel`,
-  deliveryOrders: (status) => `${API_BASE}/export/delivery-orders?format=excel${status ? `&status=${status}` : ''}`,
-  users: () => `${API_BASE}/export/users?format=excel`,
+  liftings: (params) => withDownloadToken(`${API_BASE}/export/liftings?format=excel&${new URLSearchParams(params).toString()}`),
+  inventory: () => withDownloadToken(`${API_BASE}/export/inventory?format=excel`),
+  deliveryOrders: (status) => withDownloadToken(`${API_BASE}/export/delivery-orders?format=excel${status ? `&status=${status}` : ''}`),
+  users: () => withDownloadToken(`${API_BASE}/export/users?format=excel`),
 };
 
 // Import
 export const importApi = {
-  getTemplate: (entity) => `${API_BASE}/import/template/${entity}`,
+  getTemplate: (entity) => withDownloadToken(`${API_BASE}/import/template/${entity}`),
   bulkImport: (entity, file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -222,6 +252,12 @@ export const importApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   }
+};
+
+// Downloads / Gatepass
+export const downloadsApi = {
+  getDriverGatepass: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-driver-gatepass`),
+  getHelperGatepass: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-helper-gatepass`),
 };
 
 // Users
@@ -243,9 +279,9 @@ export const permissionsApi = {
 export const productAccessApi = {
   getAll: () => api.get('/product-access'),
   getUserAccess: (userId) => api.get(`/product-access/user/${userId}`),
-  updateUserAccess: (userId, assignedProducts) => api.put(`/product-access/user/${userId}`, { 
-    user_id: userId, 
-    assigned_products: assignedProducts 
+  updateUserAccess: (userId, assignedProducts) => api.put(`/product-access/user/${userId}`, {
+    user_id: userId,
+    assigned_products: assignedProducts
   }),
   grantProductAccess: (productId, userIds) => api.post(`/product-access/product/${productId}/grant`, {
     product_id: productId,
@@ -298,7 +334,7 @@ export const purchaseOrdersApi = {
   complete: (id, data) => api.put(`/purchase-orders/${id}/complete`, data),
   getStatement: (id) => api.get(`/purchase-orders/${id}/statement`),
   delete: (id) => api.delete(`/purchase-orders/${id}`),
-  exportStatement: (id, format) => `${API_BASE}/purchase-orders/${id}/statement/export?format=${format}`
+  exportStatement: (id, format) => withDownloadToken(`${API_BASE}/purchase-orders/${id}/statement/export?format=${format}`)
 };
 
 export const pickupApi = {
@@ -321,6 +357,8 @@ export const pickupApi = {
     api.put(`/pickups/${id}/company`, data),
   uploadTareSlip: (id, data) =>
     api.put(`/pickups/${id}/tare-slip`, data),
+  uploadWeightmentSlip: (id, data) =>
+    api.put(`/pickups/${id}/weightment-slip`, data),
   updateWeightment: (id, data) =>
     api.put(`/pickups/${id}/weightment`, data),
   finalVerify: (id, data) =>
@@ -346,6 +384,6 @@ export const uploadFile = async (file) => {
   return response.data;
 };
 
-export const getFileUrl = (fileId) => `${API_BASE}/uploads/${fileId}`;
+export const getFileUrl = (fileId) => withDownloadToken(`${API_BASE}/uploads/${fileId}`);
 
 export default api;

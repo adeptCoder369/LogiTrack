@@ -223,9 +223,18 @@ export default function CompanyReports() {
     setDateRange({ from: '', to: '' });
   };
 
-  // Get company-wise product reports from secondary liftings
   const getCompanyReports = () => {
     const reports = {};
+    const liftingPickupIds = new Set(
+        liftings
+            .map(l => l.pickup_id)
+            .filter(Boolean)
+    );
+
+    const companyNameToId = {};
+    companies.forEach(c => {
+      if (c.name) companyNameToId[c.name.toLowerCase()] = c.id;
+    });
 
     // Filter liftings based on selected company and date range
     let filteredLiftings = [...liftings];
@@ -309,14 +318,19 @@ export default function CompanyReports() {
 
     // Group by company (unloading point for secondary liftings)
     filteredLiftings.forEach(lifting => {
+
+        if (!["Verified", "Pending"].includes(lifting.unloading_status)) {
+          return;
+        }
       const companyName = lifting.unloading_point_name || 'Unknown Company';
-      const companyId = lifting.unloading_point_id || companyName;
+      const rawCompanyId = lifting.unloading_point_id || companyName;
+      const normalizedCompanyId = companyNameToId[companyName.toLowerCase()] || rawCompanyId;
       const productName = lifting.product_name || 'Unknown Product';
       const productId = lifting.product_id || productName;
 
-      if (!reports[companyId]) {
-        reports[companyId] = {
-          companyId,
+      if (!reports[normalizedCompanyId]) {
+        reports[normalizedCompanyId] = {
+          companyId: normalizedCompanyId,
           companyName,
           totalQuantity: 0,
           totalVerified: 0,
@@ -328,72 +342,77 @@ export default function CompanyReports() {
       }
 
       // Update company totals
-      const qty = lifting.quantity_mt || 0;
-      reports[companyId].totalQuantity += qty;
-      reports[companyId].totalPOQuantity += qty;
-      reports[companyId].totalLiftings += 1;
-      reports[companyId].liftings.push(lifting);
+      const qty = Number(
+            lifting.net_weight_mt ??
+            lifting.quantity_mt ??
+            0
+        );
+        reports[normalizedCompanyId].totalQuantity += qty;
+        reports[normalizedCompanyId].totalLiftings += 1;
+        reports[normalizedCompanyId].liftings.push(lifting);
 
-      if (lifting.unloading_status === 'Verified') {
-        reports[companyId].totalVerified += lifting.quantity_mt || 0;
-      } else {
-        reports[companyId].totalPending += lifting.quantity_mt || 0;
-      }
+        if (lifting.unloading_status === 'Verified') {
+          reports[normalizedCompanyId].totalVerified += qty;
+        } else {
+          reports[normalizedCompanyId].totalPending += qty;
+        }
 
-      // Group by product within company
-      if (!reports[companyId].products[productId]) {
-        reports[companyId].products[productId] = {
-          productId,
-          productName,
-          productCode: lifting.product_code || '',
-          quantity: 0,
-          totalPOQuantity: 0,
-          verified: 0,
-          pending: 0,
-          liftings: [],
-          fromDepots: {}
-        };
-      }
+        // Group by product within company
+        if (!reports[normalizedCompanyId].products[productId]) {
+          reports[normalizedCompanyId].products[productId] = {
+            productId,
+            productName,
+            productCode: lifting.product_code || '',
+            quantity: 0,
+            totalPOQuantity: 0,
+            verified: 0,
+            pending: 0,
+            liftings: [],
+            fromDepots: {}
+          };
+        }
 
-      const productQty = lifting.quantity_mt || 0;
-      reports[companyId].products[productId].quantity += productQty;
-      reports[companyId].products[productId].totalPOQuantity += productQty;
-      reports[companyId].products[productId].liftings.push(lifting);
+        const productQty = lifting.quantity_mt || 0;
+        reports[normalizedCompanyId].products[productId].quantity += productQty;
+        reports[normalizedCompanyId].products[productId].liftings.push(lifting);
 
-      if (lifting.unloading_status === 'Verified') {
-        reports[companyId].products[productId].verified += lifting.quantity_mt || 0;
-      } else {
-        reports[companyId].products[productId].pending += lifting.quantity_mt || 0;
-      }
+        if (lifting.unloading_status === 'Verified') {
+          reports[normalizedCompanyId].products[productId].verified += qty;
+        } else {
+          reports[normalizedCompanyId].products[productId].pending += qty;
+        }
 
-      // Track source depots for this product
-      const fromDepot = lifting.loading_point_name || 'Unknown Depot';
-      if (!reports[companyId].products[productId].fromDepots[fromDepot]) {
-        reports[companyId].products[productId].fromDepots[fromDepot] = {
-          name: fromDepot,
-          quantity: 0,
-          liftings: 0
-        };
-      }
-      reports[companyId].products[productId].fromDepots[fromDepot].quantity += lifting.quantity_mt || 0;
-      reports[companyId].products[productId].fromDepots[fromDepot].liftings += 1;
+        // Track source depots for this product
+        const fromDepot = lifting.loading_point_name || 'Unknown Depot';
+        if (!reports[normalizedCompanyId].products[productId].fromDepots[fromDepot]) {
+          reports[normalizedCompanyId].products[productId].fromDepots[fromDepot] = {
+            name: fromDepot,
+            quantity: 0,
+            liftings: 0
+          };
+        }
+        reports[normalizedCompanyId].products[productId].fromDepots[fromDepot].quantity += qty;
+        reports[normalizedCompanyId].products[productId].fromDepots[fromDepot].liftings += 1;
     });
 
     // ================================
-    // VERIFIED PICKUPS
+    // VERIFIED PICKUPS (exclude final_verified — they have corresponding liftings)
     // ================================
     filteredPickups.forEach((pickup) => {
 
-      if (!['verified', 'weightment_done', 'final_verified'].includes(pickup.status)) return;
+      if (liftingPickupIds.has(pickup.id))
+        return;
+      if (!['verified', 'weightment_done'].includes(pickup.status)) return;
 
       const companyName =
         pickup.purchase_order_company_name ||
         pickup.company_name ||
         'Unknown Company';
 
-      const companyId =
+      const rawCompanyId =
         pickup.purchase_order_company_id ||
         companyName;
+      const normalizedCompanyId = companyNameToId[companyName.toLowerCase()] || rawCompanyId;
 
       const productName =
         pickup.product_name ||
@@ -407,9 +426,9 @@ export default function CompanyReports() {
         pickup.weight_mt || 0
       );
 
-      if (!reports[companyId]) {
-        reports[companyId] = {
-          companyId,
+      if (!reports[normalizedCompanyId]) {
+        reports[normalizedCompanyId] = {
+          companyId: normalizedCompanyId,
           companyName,
           totalQuantity: 0,
           totalPOQuantity: 0,
@@ -422,12 +441,11 @@ export default function CompanyReports() {
       }
 
       // totals
-      reports[companyId].totalQuantity += qty;
-      reports[companyId].totalPOQuantity += qty;
-      reports[companyId].totalVerified += qty;
-      reports[companyId].totalLiftings += 1;
+      reports[normalizedCompanyId].totalQuantity += qty;
+      reports[normalizedCompanyId].totalVerified += qty;
+      reports[normalizedCompanyId].totalLiftings += 1;
 
-      reports[companyId].liftings.push({
+      reports[normalizedCompanyId].liftings.push({
         lifting_no:
           pickup.purchase_order_no,
 
@@ -451,9 +469,9 @@ export default function CompanyReports() {
       });
 
       // products
-      if (!reports[companyId].products[productId]) {
+      if (!reports[normalizedCompanyId].products[productId]) {
 
-        reports[companyId].products[productId] = {
+        reports[normalizedCompanyId].products[productId] = {
           productId,
           productName,
 
@@ -469,12 +487,11 @@ export default function CompanyReports() {
         };
       }
 
-      reports[companyId].products[productId].quantity += qty;
-      reports[companyId].products[productId].totalPOQuantity += qty;
+      reports[normalizedCompanyId].products[productId].quantity += qty;
 
-      reports[companyId].products[productId].verified += qty;
+      reports[normalizedCompanyId].products[productId].verified += qty;
 
-      reports[companyId].products[productId].liftings.push({
+      reports[normalizedCompanyId].products[productId].liftings.push({
         lifting_no:
           pickup.purchase_order_no,
 
@@ -482,10 +499,10 @@ export default function CompanyReports() {
           pickup.truck_number,
 
         driver_name:
-          pickup.driver_phone,
+          pickup.driver_name || pickup.driver_phone || '',
 
         loading_point_name:
-          pickup.depot_name,
+          pickup.depot_name || pickup.source_name || 'Unknown Depot',
 
         quantity_mt:
           qty,
@@ -499,15 +516,15 @@ export default function CompanyReports() {
 
       // depot tracking
       const fromDepot =
-        pickup.depot_name || 'Unknown Depot';
+        pickup.depot_name || pickup.source_name || 'Unknown Depot';
 
       if (
-        !reports[companyId]
+        !reports[normalizedCompanyId]
           .products[productId]
           .fromDepots[fromDepot]
       ) {
 
-        reports[companyId]
+        reports[normalizedCompanyId]
           .products[productId]
           .fromDepots[fromDepot] = {
           name: fromDepot,
@@ -516,31 +533,46 @@ export default function CompanyReports() {
         };
       }
 
-      reports[companyId]
+      reports[normalizedCompanyId]
         .products[productId]
         .fromDepots[fromDepot]
         .quantity += qty;
 
-      reports[companyId]
+      reports[normalizedCompanyId]
         .products[productId]
         .fromDepots[fromDepot]
         .liftings += 1;
 
     });
-    // Initialize PO metrics for all active company records
-    Object.keys(reports).forEach(companyId => {
-      reports[companyId].totalPOCount = 0;
-      reports[companyId].totalPOQuantity = 0;
-    });
-
-    // Count purchase orders and sum their total quantities
+    // Calculate PO metrics per company and per product
     purchaseOrders.forEach(po => {
-      const companyId = po.to_company_name || '';
+      const rawCompanyId = po.belongs_to_company_id || '';
+      const quantity = parseFloat(po?.total_quantity_mt) || 0;
+      const poProductId = po.product_id || '';
 
-      if (companyId && reports[companyId]) {
-        reports[companyId].totalPOCount += 1;
-        const quantity = parseFloat(po?.total_quantity_mt) || 0;
-        reports[companyId].totalPOQuantity += quantity;
+      let targetCompanyId = rawCompanyId;
+      if (rawCompanyId && reports[rawCompanyId]) {
+        targetCompanyId = rawCompanyId;
+      } else {
+        const companyName = po.company_name || po.to_company_name || '';
+        if (companyName) {
+          const normalizedName = companyName.toLowerCase();
+          if (companyNameToId[normalizedName]) {
+            targetCompanyId = companyNameToId[normalizedName];
+          } else {
+            targetCompanyId = companyName;
+          }
+        }
+      }
+
+      if (targetCompanyId && reports[targetCompanyId]) {
+        reports[targetCompanyId].totalPOCount = (reports[targetCompanyId].totalPOCount || 0) + 1;
+        reports[targetCompanyId].totalPOQuantity = (reports[targetCompanyId].totalPOQuantity || 0) + quantity;
+
+        if (poProductId && reports[targetCompanyId].products[poProductId]) {
+          reports[targetCompanyId].products[poProductId].totalPOQuantity =
+            (reports[targetCompanyId].products[poProductId].totalPOQuantity || 0) + quantity;
+        }
       }
     });
 
@@ -880,7 +912,6 @@ export default function CompanyReports() {
                   {/* Product-wise Breakdown */}
 
                   <CompanyReportsDataTable
-                    totalPO={company.totalPOQuantity}
                     isExpanded={isExpanded}
                     productsList={productsList}
                   />

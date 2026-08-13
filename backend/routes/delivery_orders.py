@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 
-from database import db
+from .db_compat import db
 from auth_utils import get_current_user, check_permission, build_product_filter, build_depot_filter, check_product_access
 from models import DeliveryOrder, DeliveryOrderCreate
 

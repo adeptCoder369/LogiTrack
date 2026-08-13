@@ -216,6 +216,28 @@ export default function LiftingReports() {
     return summary;
   };
 
+  const getDateGroupDirectionSummary = (dateGroup) => {
+    const summary = {
+      inLiftings: 0,
+      outLiftings: 0,
+      inQuantity: 0,
+      outQuantity: 0
+    };
+
+    dateGroup?.liftings?.forEach((lifting) => {
+      const qty = Number(lifting.quantity_mt) || 0;
+      if (lifting.lifting_type === 'Primary') {
+        summary.inLiftings += 1;
+        summary.inQuantity += qty;
+      } else {
+        summary.outLiftings += 1;
+        summary.outQuantity += qty;
+      }
+    });
+
+    return summary;
+  };
+
   const reportStatusSummary = useMemo(() => {
     const status = {
       verified_liftings: 0,
@@ -470,7 +492,10 @@ export default function LiftingReports() {
                   <div>
                     <h3 className="font-semibold text-slate-900">{formatDate(dateGroup.date)}</h3>
                     <p className="text-sm text-slate-600">
-                      {dateGroup.total_liftings} liftings • {dateGroup.total_quantity_mt.toFixed(2)} MT
+                      {(() => {
+                        const direction = getDateGroupDirectionSummary(dateGroup);
+                        return `${direction.inLiftings} IN • ${direction.outLiftings} OUT • ${direction.inQuantity.toFixed(2)} MT IN • ${direction.outQuantity.toFixed(2)} MT OUT`;
+                      })()}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
                       {(() => {
@@ -482,11 +507,30 @@ export default function LiftingReports() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex gap-2">
-                    {Object.entries(dateGroup.by_product).slice(0, 3).map(([product, data]) => (
-                      <span key={product} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                        {product}: {data.quantity_mt.toFixed(1)} MT
-                      </span>
-                    ))}
+                    {(() => {
+                      const productSummary = {};
+
+                      dateGroup.liftings?.forEach((lifting) => {
+                        const productName = lifting.product_name || 'Unknown';
+                        const qty = Number(lifting.quantity_mt) || 0;
+
+                        if (!productSummary[productName]) {
+                          productSummary[productName] = { inQty: 0, outQty: 0 };
+                        }
+
+                        if (lifting.lifting_type === 'Primary') {
+                          productSummary[productName].inQty += qty;
+                        } else {
+                          productSummary[productName].outQty += qty;
+                        }
+                      });
+
+                      return Object.entries(productSummary).slice(0, 3).map(([product, summary]) => (
+                        <span key={product} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                          {product}: {summary.inQty.toFixed(1)} IN / {summary.outQty.toFixed(1)} OUT MT
+                        </span>
+                      ));
+                    })()}
                   </div>
                   {expandedDates[dateGroup.date] ? (
                     <ChevronUp className="w-5 h-5 text-slate-400" />
@@ -618,7 +662,11 @@ export default function LiftingReports() {
                                 ? lifting.loading_siding_name
                                 : lifting.vehicle_number || '-'}
                             </td>
-                            <td className="px-4 py-2">{lifting.loading_point_name || '-'}</td>
+                            <td className="px-4 py-2">
+              {lifting.lifting_type === 'Primary' 
+                ? (lifting.loading_point_name || lifting.loading_siding_name || lifting.source_name || '-') 
+                : (lifting.loading_point_name || lifting.source_name || lifting.from_depot_name || lifting.from_company_name || '-')}
+            </td>
                             <td className="px-4 py-2">{lifting.unloading_point_name || '-'}</td>
                             <td className="px-4 py-2">
                               <span className={`px-2 py-0.5 rounded text-xs ${lifting.unloading_status === 'Verified'

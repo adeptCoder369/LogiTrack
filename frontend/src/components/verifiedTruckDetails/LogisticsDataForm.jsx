@@ -14,12 +14,23 @@ export const LogisticsDataForm = ({
     formData,
     updateForm,
     onSubmit,
-    onCancel
+    onCancel,
+    autoFocusField
 }) => {
     const isInvoice = type === 'invoice';
     const isShipping = type === 'shipping';
     const isPackingList = type === 'packingList';
     const labelPrefix = isInvoice ? 'Invoice' : isShipping ? 'Shipping' : 'Packing List';
+    const numberInputRef = React.useRef(null);
+    const dateInputRef = React.useRef(null);
+
+    React.useEffect(() => {
+        if (autoFocusField === 'number') {
+            numberInputRef.current?.focus();
+        } else if (autoFocusField === 'date') {
+            dateInputRef.current?.focus();
+        }
+    }, [autoFocusField, type, truckId]);
 
     // Build the resource destination link for both local states and database keys
     const getDocumentUrl = () => {
@@ -30,7 +41,7 @@ export const LogisticsDataForm = ({
 
         // Case 2: Reading the existing file reference from your database payload
         const savedFileId = formData?.file_id || formData?.do_copy_file_id || formData?.invoice_copy_id || formData?.file;
-        
+
         if (savedFileId && typeof savedFileId === 'string') {
             // If the backend returned a full absolute web address string directly
             if (savedFileId.startsWith('http://') || savedFileId.startsWith('https://')) {
@@ -39,7 +50,7 @@ export const LogisticsDataForm = ({
             // Fallback to your local Node Express storage upload path routing
             return `http://localhost:8000/api/uploads/${savedFileId}`;
         }
-        
+
         return null;
     };
 
@@ -64,6 +75,7 @@ export const LogisticsDataForm = ({
                 <div>
                     <Label className="text-xs font-medium text-slate-700">{labelPrefix} No. *</Label>
                     <Input
+                        ref={numberInputRef}
                         required
                         placeholder={isInvoice ? "e.g. INV/2026/0042" : isShipping ? "e.g. SH-BL-9081" : "e.g. PL/2026/001"}
                         value={formData?.number || formData?.invoiceNo || formData?.shippingNo || formData?.packingListNo || ''}
@@ -74,6 +86,7 @@ export const LogisticsDataForm = ({
                 <div>
                     <Label className="text-xs font-medium text-slate-700">{labelPrefix} Date *</Label>
                     <Input
+                        ref={dateInputRef}
                         required
                         type="date"
                         value={formData?.date || formData?.invoiceDate || formData?.shippingDate || formData?.packingListDate || ''}
@@ -96,45 +109,45 @@ export const LogisticsDataForm = ({
                     />
                 </div>
             </div> */}
-            {!isPackingList && <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-  <div className="flex flex-col gap-1">
-    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-0.5 select-none">
-      {labelPrefix} Amount
-    </Label>
-    
-    {/* Combined Flex Container for Dropdown and Number Field */}
-    <div className="flex items-center shadow-sm rounded-lg border border-slate-200 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 overflow-hidden bg-white h-10 mt-0.5 transition-all">
-      
-      {/* 1. Currency Unit Selection Dropdown */}
-      <div className="relative border-r border-slate-200 bg-slate-50 h-full flex items-center">
-        <select
-          value={formData?.currency || 'INR'}
-          onChange={(e) => updateForm(`${type}_${truckId}`, 'currency', e.target.value)}
-          className="bg-transparent pl-3 pr-7 h-full text-xs font-bold text-slate-700 outline-none appearance-none cursor-pointer select-none"
-        >
-          <option value="INR">₹ INR</option>
-          <option value="USD">$ USD</option>
-          <option value="EUR">€ EUR</option>
-          <option value="AED">د.إ AED</option>
-          <option value="GBP">£ GBP</option>
-        </select>
-        {/* Subtle select indicator icon arrow */}
-        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none">▼</span>
-      </div>
+            {!isPackingList && <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
+                <div className="flex flex-col gap-1">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-0.5 select-none">
+                        {labelPrefix} Amount
+                    </Label>
 
-      {/* 2. Numeric Amount Input Field */}
-      <Input
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder={isInvoice ? "Enter Invoice Amount" : "Enter Shipping Bill Amount"}
-        value={formData?.invoiceAmount || formData?.invoice_amount || formData?.shippingBillAmount || formData?.shipping_bill_amount || ''}
-        onChange={(e) => updateForm(`${type}_${truckId}`, isInvoice ? 'invoiceAmount' : 'shippingBillAmount', e.target.value)}
-        className="flex-1 h-full border-0 rounded-none bg-transparent text-xs font-semibold text-slate-700 focus-visible:ring-0 focus-visible:ring-offset-0 px-3 placeholder:text-slate-400"
-      />
-    </div>
-  </div>
-</div>}
+                    {/* Combined Flex Container for Dropdown and Number Field */}
+                    <div className="flex items-center shadow-sm rounded-lg border border-slate-200 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 overflow-hidden bg-white h-10 mt-0.5 transition-all">
+
+                        {/* 1. Currency Unit Selection Dropdown */}
+                        <div className="relative border-r border-slate-200 bg-slate-50 h-full flex items-center">
+                            <select
+                                value={formData?.currency || 'INR'}
+                                onChange={(e) => updateForm(`${type}_${truckId}`, 'currency', e.target.value)}
+                                className="bg-transparent pl-3 pr-7 h-full text-xs font-bold text-slate-700 outline-none appearance-none cursor-pointer select-none"
+                            >
+                                <option value="INR">₹ INR</option>
+                                <option value="USD">$ USD</option>
+                                <option value="EUR">€ EUR</option>
+                                <option value="AED">د.إ AED</option>
+                                <option value="GBP">£ GBP</option>
+                            </select>
+                            {/* Subtle select indicator icon arrow */}
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none">▼</span>
+                        </div>
+
+                        {/* 2. Numeric Amount Input Field */}
+                        <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={isInvoice ? "Enter Invoice Amount" : "Enter Shipping Bill Amount"}
+                            value={formData?.invoiceAmount || formData?.invoice_amount || formData?.shippingBillAmount || formData?.shipping_bill_amount || ''}
+                            onChange={(e) => updateForm(`${type}_${truckId}`, isInvoice ? 'invoiceAmount' : 'shippingBillAmount', e.target.value)}
+                            className="flex-1 h-full border-0 rounded-none bg-transparent text-xs font-semibold text-slate-700 focus-visible:ring-0 focus-visible:ring-offset-0 px-3 placeholder:text-slate-400"
+                        />
+                    </div>
+                </div>
+            </div>}
             <div>
                 <Label className="text-xs font-medium text-slate-700">{isPackingList ? 'Remarks' : 'Comments'}</Label>
                 <textarea
@@ -146,14 +159,14 @@ export const LogisticsDataForm = ({
                 />
             </div>
             <div>
-                <Label className="text-xs font-medium text-slate-700">Upload {isInvoice ? 'Invoice Copy' : isShipping ? 'Manifest / LR' : 'Packing List Copy'}</Label>
+                <Label className="text-xs font-medium text-slate-700">Upload {isInvoice ? 'Invoice Copy' : isShipping ? 'Shipping Bill' : 'Packing List Copy'}</Label>
                 <input
                     type="file"
                     accept="application/pdf,image/*"
                     className="block w-full text-xs text-slate-500 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mt-1"
                     onChange={(e) => updateForm(`${type}_${truckId}`, 'file', e.target.files?.[0])}
                 />
-                
+
                 {/* Preview and Existing Document Meta Frame Container */}
                 {targetUrl && (
                     <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
@@ -168,9 +181,9 @@ export const LogisticsDataForm = ({
                                     {isStagedLocalFile ? `Staged: ${formData.file.name}` : "Previously Saved Document"}
                                 </span>
                             </div>
-                            <a 
-                                href={targetUrl} 
-                                target="_blank" 
+                            <a
+                                href={targetUrl}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold shrink-0 flex items-center gap-0.5 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm"
                             >
@@ -181,9 +194,9 @@ export const LogisticsDataForm = ({
                         {/* Interactive Visual Thumbnail Engine */}
                         {isImageFile(targetUrl) && (
                             <div className="relative w-28 h-28 border border-slate-200 rounded-md overflow-hidden bg-white shadow-inner group">
-                                <img 
-                                    src={targetUrl} 
-                                    alt="Document Visual Target Preview" 
+                                <img
+                                    src={targetUrl}
+                                    alt="Document Visual Target Preview"
                                     className="w-full h-full object-cover"
                                     onError={(e) => {
                                         // Hide layout clean if asset routing breaks or is a PDF with complex layout signatures
@@ -201,11 +214,11 @@ export const LogisticsDataForm = ({
                         )}
                     </div>
                 )}
-                            {!formData?.file && (formData?.fileName || formData?.file_id || formData?.fileId) && (
-                                <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-1">
-                                    ✓ Registered: {formData.fileName || formData.file_id || formData.fileId}
-                                </div>
-                            )}
+                {!formData?.file && (formData?.fileName || formData?.file_id || formData?.fileId) && (
+                    <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-1">
+                        ✓ Registered: {formData.fileName || formData.file_id || formData.fileId}
+                    </div>
+                )}
             </div>
             <div className="flex gap-2 justify-end pt-1">
                 <Button
