@@ -61,7 +61,7 @@ COUNTRY_CODES = {
 }
 
 app = FastAPI()
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(prefix="/api/v1")
 security = HTTPBearer()
 
 
@@ -675,7 +675,9 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     safe_filename = re.sub(r'[^\w\-_\.]', '_', original_filename)
     unique_prefix = str(uuid.uuid4())[:8]
     file_name = f"{unique_prefix}_{safe_filename}"
-    file_path = UPLOAD_DIR / file_name
+    tenant_dir = UPLOAD_DIR / (current_user.get("tenant_id") or PLATFORM_TENANT_ID)
+    tenant_dir.mkdir(exist_ok=True)
+    file_path = tenant_dir / file_name
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     return {"file_id": file_name, "filename": original_filename, "original_name": original_filename}
@@ -683,7 +685,16 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
 
 @api_router.get("/uploads/{file_id}")
 async def get_file(file_id: str, current_user: dict = Depends(get_download_user)):
-    file_path = UPLOAD_DIR / file_id
+    # Tenant-isolated storage with a legacy-root fallback so files uploaded
+    # before Phase 0 keep working without any file moves.
+    candidate = None
+    if current_user:
+        candidate = UPLOAD_DIR / (current_user.get("tenant_id") or PLATFORM_TENANT_ID) / file_id
+        if not candidate.exists():
+            candidate = None
+    if candidate is None:
+        candidate = UPLOAD_DIR / file_id
+    file_path = candidate
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     original_name = file_id.split('_', 1)[1] if '_' in file_id else file_id
@@ -1731,7 +1742,7 @@ from routes import (
     products_router, railway_sidings_router, railway_zones_router, depots_router,
     delivery_orders_router, liftings_router, permissions_router, product_access_router,
     depot_access_router, purchase_orders_router, pickups_router,
-    verified_trucks_router, company_inventory_router
+    verified_trucks_router, company_inventory_router, tenants_router
 )
 
 api_router.include_router(reports_router)
@@ -1751,6 +1762,7 @@ api_router.include_router(purchase_orders_router)
 api_router.include_router(pickups_router)
 api_router.include_router(verified_trucks_router)
 api_router.include_router(company_inventory_router)
+api_router.include_router(tenants_router)
 
 app.include_router(api_router)
 
