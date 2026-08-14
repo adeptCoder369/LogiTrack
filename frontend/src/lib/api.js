@@ -1,15 +1,11 @@
 import axios from 'axios';
 import { enqueueOfflineRequest, isMutation, isOnline } from './offline';
-
-// Phase 0: all API routes live under /api/v1. A configured base ending in
-// /api is auto-upgraded so old .env files keep working.
+// ================================================================================================================
 export const BACKEND_URL = (
-  process.env.REACT_APP_BACKEND_URL || 'https://dashboard.infoeight.com/api/v1'
+  process.env.REACT_APP_BACKEND_URL
 ).replace(/\/api$/, '/api/v1');
-// export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://logitrack-backend-bdv4.onrender.com';
-// export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ;
-console.log('BACKEND_URL_______________________________:', BACKEND_URL);
-const API_BASE = `${BACKEND_URL}`;
+
+const API_BASE = `${BACKEND_URL}/api/v1`;
 const DOWNLOAD_TOKEN_KEY = 'download_token';
 
 const api = axios.create({
