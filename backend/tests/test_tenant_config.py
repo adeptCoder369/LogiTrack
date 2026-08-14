@@ -100,7 +100,7 @@ async def test_find_user_by_mobile_single_result(monkeypatch):
 
     monkeypatch.setattr(server, "AsyncSessionLocal", lambda: FakeSession([make_user()]))
     user = await server._find_user_by_mobile("9999999999", "91")
-    assert user.tenant_id == "T1"
+    assert user["tenant_id"] == "T1"
 
 
 async def test_find_user_by_mobile_ambiguous_requires_tenant(monkeypatch):
@@ -124,7 +124,7 @@ async def test_find_user_by_mobile_tenant_scope_resolves(monkeypatch):
         lambda: FakeSession([make_user(id="a", tenant_id="T1"), make_user(id="b", tenant_id="T2")]),
     )
     user = await server._find_user_by_mobile("9999999999", "91", tenant_id="T2")
-    assert user.id == "b"
+    assert user["id"] == "b"
 
 
 async def test_find_user_by_mobile_no_match_returns_none(monkeypatch):

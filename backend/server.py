@@ -251,7 +251,10 @@ async def _find_user_by_mobile(
     if len(users) == 1:
         return users[0]
     if tenant_id:
-        return next((u for u in users if u.tenant_id == tenant_id), None)
+        return next(
+            (u for u in users if (u.get("tenant_id") if hasattr(u, "get") else u.tenant_id) == tenant_id),
+            None,
+        )
     raise HTTPException(
         status_code=401,
         detail="This mobile belongs to more than one workspace. Please provide your tenant slug.",

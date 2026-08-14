@@ -82,6 +82,86 @@ def reset_tenant_context():
     tenant_mod._tenant_flags_var.set(None)
 
 
+# ---------- fake db_compat collections (Phase 1 tests) ----------
+
+class FakeCursor:
+    def __init__(self, items=None):
+        self.items = items or []
+
+    async def to_list(self, n=None):
+        return self.items
+
+
+class FakeCollection:
+    """In-memory stand-in for a db_compat collection proxy.
+
+    Honors plain equality keys and the common {"active": {"$ne": False}}
+    pattern; records the filters it receives so tests can assert them.
+    """
+
+    def __init__(self, rows=None, rowcount=0):
+        self.rows = list(rows or [])
+        self.calls = []
+        self.rowcount = rowcount
+
+    def _filter(self, filter_dict):
+        rows = self.rows
+        or_branches = (filter_dict or {}).get("$or")
+        if or_branches:
+            def _matches(r, branch):
+                for k, v in branch.items():
+                    if isinstance(v, dict) and list(v.keys()) == ["$in"]:
+                        if r.get(k) not in v["$in"]:
+                            return False
+                    elif isinstance(v, dict):
+                        continue
+                    elif r.get(k) != v:
+                        return False
+                return True
+
+            rows = [r for r in rows if any(_matches(r, b) for b in or_branches)]
+        for k, v in (filter_dict or {}).items():
+            if k == "$or":
+                continue
+            if isinstance(v, dict) and list(v.keys()) == ["$ne"]:
+                rows = [r for r in rows if r.get(k) != v["$ne"]]
+            elif isinstance(v, dict) and list(v.keys()) == ["$nin"]:
+                rows = [r for r in rows if r.get(k) not in v["$nin"]]
+            elif isinstance(v, dict) and list(v.keys()) == ["$in"]:
+                rows = [r for r in rows if r.get(k) in v["$in"]]
+            elif isinstance(v, dict):
+                continue
+            else:
+                rows = [r for r in rows if r.get(k) == v]
+        return rows
+
+    def find(self, filter_dict=None, projection=None):
+        # db_compat.find() is synchronous (returns a cursor); only to_list
+        # is awaited.
+        self.calls.append(("find", filter_dict, projection))
+        return FakeCursor(self._filter(filter_dict))
+
+    async def find_one(self, filter_dict=None, projection=None):
+        self.calls.append(("find_one", filter_dict, projection))
+        rows = self._filter(filter_dict or {})
+        return rows[0] if rows else None
+
+    async def count_documents(self, filter_dict=None):
+        return len(self._filter(filter_dict or {}))
+
+
+class FakeDb:
+    """Stand-in for the db_compat proxy with named collections."""
+
+    def __init__(self, **collections):
+        self._collections = collections
+
+    def __getattr__(self, name):
+        if name in self._collections:
+            return self._collections[name]
+        raise AttributeError(f"No fake collection: {name}")
+
+
 def make_user(**overrides):
     base = {
         "id": "u1",
@@ -92,4 +172,4 @@ def make_user(**overrides):
         "is_master_admin": False,
     }
     base.update(overrides)
-    return SimpleNamespace(**base)
+    return base
