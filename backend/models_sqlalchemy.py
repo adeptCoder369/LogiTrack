@@ -479,6 +479,8 @@ class PurchaseOrder(Base):
     tenant_id = Column(VARCHAR(36), nullable=False)
     depot_id = Column(VARCHAR(36))
     depot_name = Column(VARCHAR(255))
+    source_id = Column(VARCHAR(36))
+    source_name = Column(VARCHAR(255))
     source_type = Column(VARCHAR(50), default='Depot')
     to_company_id = Column(VARCHAR(36))
     to_company_name = Column(VARCHAR(255))
@@ -505,6 +507,7 @@ class PurchaseOrder(Base):
         Index('idx_status', 'status'),
         Index('idx_product', 'product_id'),
         Index('idx_company', 'to_company_id'),
+        Index('idx_source', 'source_id'),
         Index('idx_tenant', 'tenant_id'),
     )
 

@@ -499,6 +499,8 @@ class VerifyUnloadRequest(BaseModel):
 class PurchaseOrderBase(BaseModel):
     depot_id: Optional[str] = None
     depot_name: Optional[str] = None
+    source_id: Optional[str] = None
+    source_name: Optional[str] = None
     source_type: Optional[str] = "Depot"
     
     to_company_id: Optional[str] = None

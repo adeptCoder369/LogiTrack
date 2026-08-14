@@ -5,10 +5,65 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from .db_compat import db
-from auth_utils import get_current_user, check_permission, build_product_filter, build_depot_filter, check_product_access, check_depot_access, build_source_exclusion_filter_async
+from auth_utils import get_current_user, check_permission, build_product_filter, build_depot_filter, check_product_access, check_depot_access, build_source_exclusion_filter_async, get_excluded_source_ids
 from models import PurchaseOrder, PurchaseOrderCreate
 
 router = APIRouter(tags=["Purchase Orders"])
+
+
+async def _resolve_po_source(current_user: dict, data: PurchaseOrderCreate, existing: Optional[dict] = None):
+    """Resolve + validate the PO source.
+
+    Returns (source_type, source_id, source_name). Accepts the explicit
+    source_id/source_name fields with a legacy depot_id/depot_name fallback;
+    verifies the source exists (tenant-scoped) and is visible to the user
+    under the source_products restriction.
+    """
+    source_type = data.source_type or (existing or {}).get("source_type", "Depot")
+    source_id = data.source_id or data.depot_id
+    if not source_id and existing:
+        source_id = existing.get("source_id") or existing.get("depot_id")
+
+    if source_type == "Depot":
+        if not source_id:
+            raise HTTPException(status_code=400, detail="Depot is required when source type is Depot")
+        source = await db.depots.find_one({"id": source_id})
+    else:
+        if not source_id:
+            raise HTTPException(status_code=400, detail="Source company is required when source type is Company")
+        source = await db.companies.find_one({"id": source_id})
+
+    if not source:
+        raise HTTPException(status_code=404, detail=f"{source_type} source not found")
+
+    excluded = await get_excluded_source_ids(current_user)
+    if excluded and source_id in excluded:
+        raise HTTPException(status_code=403, detail="You don't have access to this source")
+
+    return source_type, source_id, source.get("name") or ""
+
+
+async def _validate_source_product_mapping(source_type: str, source_id: str, product_id: Optional[str]) -> None:
+    """A PO must match a mapped source<->product pair once mappings exist.
+
+    Unmapped sources accept any product (mapping is an opt-in restriction).
+    """
+    if not product_id:
+        return
+    has_mappings = await db.source_products.find_one({
+        "source_type": source_type, "source_id": source_id, "active": {"$ne": False}
+    })
+    if not has_mappings:
+        return
+    mapping = await db.source_products.find_one({
+        "source_type": source_type, "source_id": source_id,
+        "product_id": product_id, "active": {"$ne": False}
+    })
+    if not mapping:
+        raise HTTPException(
+            status_code=400,
+            detail="This product is not mapped to the selected source",
+        )
 
 
 # ✅ CREATE PURCHASE ORDER
@@ -19,40 +74,38 @@ async def create_purchase_order(
 ):
     # Permission check
     await check_permission(current_user, "Purchase Orders (Create)")
-    
+
     # Product access check
     if data.product_id:
         await check_product_access(current_user, data.product_id)
-    
-    # Validate source type
-    source_type = data.source_type or "Depot"
-    if source_type == "Depot" and not data.depot_id:
-        raise HTTPException(status_code=400, detail="Depot is required when source type is Depot")
-    if source_type == "Company" and not data.depot_id:
-        raise HTTPException(status_code=400, detail="Source company is required when source type is Company")
-    
-    company_name = ""
-    if source_type == "Company" and data.depot_id:
-        company = await db.companies.find_one({"id": data.depot_id})
-        if company:
-            company_name = company.get("name", "")
-    
+
+    # Resolve + validate source (existence, visibility)
+    source_type, source_id, source_name = await _resolve_po_source(current_user, data)
+
+    # Source <-> product mapping revalidation
+    await _validate_source_product_mapping(source_type, source_id, data.product_id)
+
     # Generate PO number
     count = await db.purchase_orders.count_documents({})
     po_number = f"PO-{str(count + 1).zfill(6)}"
-    
-    # Create PO
+
+    # Create PO (source_id is authoritative; depot_id/depot_name mirror it so
+    # legacy clients and the pickup/lifting flows keep working)
     order = PurchaseOrder(
-        **data.model_dump(exclude_none=True, exclude={"depot_name"}),
+        **data.model_dump(exclude_none=True),
         po_number=po_number,
-        depot_name=company_name or data.depot_name or "",
+        source_id=source_id,
+        source_name=source_name or data.depot_name or "",
+        source_type=source_type,
+        depot_id=source_id,
+        depot_name=source_name or data.depot_name or "",
         remaining_quantity_mt=data.total_quantity_mt,
         added_by=current_user["id"],
         added_by_name=current_user["name"]
     )
-    
+
     await db.purchase_orders.insert_one(order.model_dump())
-    
+
     return order
 
 
@@ -64,15 +117,14 @@ async def get_purchase_orders(
 ):
     await check_permission(current_user, "Purchase Orders (View)")
 
-    # Apply product and depot filters
+    # Apply product and source filters
     query = await build_product_filter(current_user, "product_id")
-    depot_filter = await build_depot_filter(current_user, "depot_id")
+    depot_filter = await build_depot_filter(current_user, "source_id")
     query.update(depot_filter)
 
     # Source restriction: hide POs whose source is mapped but carries no
-    # accessible product. (depot_id still carries the source in Phase 1 until
-    # the source_id columns land; the field flips in P1D.)
-    source_filter = await build_source_exclusion_filter_async(current_user, "depot_id")
+    # accessible product.
+    source_filter = await build_source_exclusion_filter_async(current_user, "source_id")
     query.update(source_filter)
 
     if status:
@@ -121,14 +173,7 @@ async def update_purchase_order(
     
     if data.product_id:
         await check_product_access(current_user, data.product_id)
-    
-    # Validate source type
-    source_type = data.source_type or existing.get("source_type", "Depot")
-    if source_type == "Depot" and not data.depot_id:
-        raise HTTPException(status_code=400, detail="Depot is required when source type is Depot")
-    if source_type == "Company" and not data.depot_id:
-        raise HTTPException(status_code=400, detail="Source company is required when source type is Company")
-    
+
     # 🔴 Optional: Prevent update if liftings already exist
     lifting_exists = await db.liftings.find_one({"purchase_order_id": order_id})
     if lifting_exists:
@@ -136,12 +181,36 @@ async def update_purchase_order(
             status_code=400,
             detail="Cannot update Purchase Order: Liftings already exist"
         )
-    
+
+    # Resolve + validate the (possibly new) source; revalidate the source<->product pair
+    source_type, source_id, source_name = await _resolve_po_source(current_user, data, existing)
+    effective_product = data.product_id or existing.get("product_id")
+    await _validate_source_product_mapping(source_type, source_id, effective_product)
+
+    update_fields = data.model_dump(exclude_none=True)
+    update_fields.update({
+        "source_id": source_id,
+        "source_name": source_name or data.source_name or existing.get("source_name") or "",
+        "source_type": source_type,
+        "depot_id": source_id,
+        "depot_name": source_name or data.depot_name or existing.get("depot_name") or "",
+    })
+
     await db.purchase_orders.update_one(
         {"id": order_id},
-        {"$set": data.model_dump(exclude_none=True)}
+        {"$set": update_fields}
     )
-    
+
+    # Cascade the source onto dependent pickups so execution views stay consistent.
+    await db.pickups.update_many(
+        {"purchase_order_id": order_id},
+        {"$set": {
+            "source_id": source_id,
+            "source_name": update_fields["source_name"],
+            "source_type": source_type,
+        }}
+    )
+
     return await db.purchase_orders.find_one({"id": order_id}, {"_id": 0})
 
 # ✅ COMPLETE PURCHASE ORDER

@@ -226,6 +226,22 @@ class _CollectionProxy:
             return _UpdateResult(matched_count=1, modified_count=1)
         return _UpdateResult(matched_count=result.rowcount, modified_count=result.rowcount)
 
+    async def update_many(self, filter_dict: Dict, update_dict: Dict):
+        conditions = self._build_conditions(filter_dict)
+        valid_cols = {c.name for c in self._model.__table__.columns}
+        set_values = {}
+        for k, v in update_dict.get('$set', {}).items():
+            if k in valid_cols:
+                set_values[k] = v
+        if not set_values:
+            return _UpdateResult(matched_count=0, modified_count=0)
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                update(self._model).where(*conditions).values(**set_values)
+            )
+            await session.commit()
+        return _UpdateResult(matched_count=result.rowcount, modified_count=result.rowcount)
+
     async def delete_one(self, filter_dict: Dict):
         conditions = self._build_conditions(filter_dict)
         async with AsyncSessionLocal() as session:
