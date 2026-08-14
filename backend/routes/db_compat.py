@@ -110,6 +110,7 @@ class DbCompat:
         'railway_zones': sql_models.RailwayZone,
         'railway_sidings': sql_models.RailwaySiding,
         'reports': sql_models.Report,
+        'source_products': sql_models.SourceProduct,
     }
 
     def __getattr__(self, name):

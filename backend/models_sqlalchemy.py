@@ -600,3 +600,21 @@ class Report(Base):
     data = Column(JSON)
     created_by = Column(VARCHAR(36))
     created_at = Column(DateTime, nullable=False)
+
+
+class SourceProduct(Base):
+    __tablename__ = 'source_products'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    source_id = Column(VARCHAR(36), nullable=False)
+    source_type = Column(VARCHAR(20), nullable=False)
+    product_id = Column(VARCHAR(36), nullable=False)
+    active = Column(Boolean, default=True)
+    created_by = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_source_product', 'tenant_id', 'source_type', 'source_id', 'product_id', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_source', 'source_type', 'source_id'),
+        Index('idx_product', 'product_id'),
+    )

@@ -323,3 +323,58 @@ async def check_product_access(user: dict, product_id: str) -> bool:
             detail=f"You don't have access to this product"
         )
     return True
+
+
+async def get_excluded_source_ids(
+    user: dict,
+    source_type: Optional[str] = None,
+    mapping_collection=None,
+) -> Optional[List[str]]:
+    """Source ids hidden from this user by the source_products restriction.
+
+    A source with NO mappings is visible to everyone (mapping is an opt-in
+    restriction). A mapped source is visible only when at least one of its
+    mapped products is in the user's accessible product set -- the "2
+    products, 1 permission" rule. This helper returns exactly the sources
+    that fail that test, so callers can add a {"$nin": excluded} clause.
+
+    Returns None for master admin / Management (no restriction).
+    """
+    if user.get("is_master_admin") or user.get("role") == "Management":
+        return None
+
+    product_ids = await get_user_product_ids(user)
+    if product_ids is None:
+        return None
+
+    from routes.db_compat import db as _db
+    mappings_coll = mapping_collection or _db.source_products
+
+    query = {"active": {"$ne": False}}
+    if source_type:
+        query["source_type"] = source_type
+    mappings = await mappings_coll.find(query, {"_id": 0}).to_list(10000)
+
+    if not mappings:
+        return []
+
+    product_set = set(product_ids)
+    visible = set()
+    for m in mappings:
+        if m.get("product_id") in product_set:
+            visible.add(m.get("source_id"))
+    all_mapped = {m.get("source_id") for m in mappings}
+    return list(all_mapped - visible)
+
+
+async def build_source_exclusion_filter_async(user: dict, source_field: str = "source_id") -> dict:
+    """db_compat filter dict for queries on source-carrying collections.
+
+    Returns {} when the user is unrestricted (master admin / Management /
+    no mappings) -- the common case -- and a {"$nin": excluded} clause only
+    when some mapped sources must be hidden.
+    """
+    excluded = await get_excluded_source_ids(user)
+    if not excluded:
+        return {}
+    return {source_field: {"$nin": excluded}}
