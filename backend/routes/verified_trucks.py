@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from .db_compat import db
 from models import VerifiedTruck, VerifiedTruckCreate
-from auth_utils import get_current_user, check_permission, build_product_filter
+from auth_utils import get_current_user, check_permission, build_product_filter, build_source_exclusion_filter_async
 
 router = APIRouter(tags=["VerifiedTrucks"])
 
@@ -39,6 +39,9 @@ async def get_verified_trucks(
     product_filter = await build_product_filter(current_user, "product_id")
     if product_filter:
         query.update(product_filter)
+
+    source_filter = await build_source_exclusion_filter_async(current_user, "source_id")
+    query.update(source_filter)
 
     if date:
         query["date"] = date

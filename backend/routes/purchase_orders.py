@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from .db_compat import db
-from auth_utils import get_current_user, check_permission, build_product_filter, build_depot_filter, check_product_access, check_depot_access
+from auth_utils import get_current_user, check_permission, build_product_filter, build_depot_filter, check_product_access, check_depot_access, build_source_exclusion_filter_async
 from models import PurchaseOrder, PurchaseOrderCreate
 
 router = APIRouter(tags=["Purchase Orders"])
@@ -68,7 +68,13 @@ async def get_purchase_orders(
     query = await build_product_filter(current_user, "product_id")
     depot_filter = await build_depot_filter(current_user, "depot_id")
     query.update(depot_filter)
-    
+
+    # Source restriction: hide POs whose source is mapped but carries no
+    # accessible product. (depot_id still carries the source in Phase 1 until
+    # the source_id columns land; the field flips in P1D.)
+    source_filter = await build_source_exclusion_filter_async(current_user, "depot_id")
+    query.update(source_filter)
+
     if status:
         query["status"] = status
 

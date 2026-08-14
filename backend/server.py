@@ -1742,7 +1742,8 @@ from routes import (
     products_router, railway_sidings_router, railway_zones_router, depots_router,
     delivery_orders_router, liftings_router, permissions_router, product_access_router,
     depot_access_router, purchase_orders_router, pickups_router,
-    verified_trucks_router, company_inventory_router, tenants_router, source_access_router
+    verified_trucks_router, company_inventory_router, tenants_router,
+    source_access_router, sources_router
 )
 
 api_router.include_router(reports_router)
@@ -1764,6 +1765,7 @@ api_router.include_router(verified_trucks_router)
 api_router.include_router(company_inventory_router)
 api_router.include_router(tenants_router)
 api_router.include_router(source_access_router)
+api_router.include_router(sources_router)
 
 app.include_router(api_router)
 

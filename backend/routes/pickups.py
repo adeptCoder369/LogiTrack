@@ -7,7 +7,7 @@ import uuid
 from pydantic import BaseModel
 
 from .db_compat import db
-from auth_utils import get_current_user, check_permission, get_user_depot_ids, build_transporter_filter, ensure_transporter_access
+from auth_utils import get_current_user, check_permission, get_user_depot_ids, build_transporter_filter, ensure_transporter_access, build_source_exclusion_filter_async
 from models import Pickup, PickupCreate, Lifting
 
 # reuse inventory logic from liftings
@@ -183,6 +183,11 @@ async def get_pickups(
             {"source_type": "Depot", "source_id": {"$in": depot_ids}},
             {"source_type": {"$ne": "Depot"}}
         ]
+
+    # source_products restriction: hide pickups whose source is mapped but
+    # carries no product the user can access.
+    source_filter = await build_source_exclusion_filter_async(current_user, "source_id")
+    query.update(source_filter)
 
     # single date mode
     if date:

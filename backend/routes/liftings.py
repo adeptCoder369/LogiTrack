@@ -10,7 +10,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from .db_compat import db
 from database import AsyncSessionLocal
 import models_sqlalchemy as sql_models
-from auth_utils import get_current_user, check_permission, build_product_filter, check_product_access
+from auth_utils import get_current_user, check_permission, build_product_filter, check_product_access, build_source_exclusion_filter_async
 from tenant import get_current_tenant_id, PLATFORM_TENANT_ID
 from models import Lifting, LiftingCreate, VerifyUnloadRequest
 
@@ -417,6 +417,9 @@ async def get_liftings(
 ):
     # Start with product-based filter
     query = await build_product_filter(current_user, "product_id")
+
+    source_filter = await build_source_exclusion_filter_async(current_user, "loading_point_id")
+    query.update(source_filter)
     
     if lifting_type:
         query["lifting_type"] = lifting_type
