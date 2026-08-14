@@ -240,9 +240,10 @@
 
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { sourcesApi } from '../../lib/api';
 import { Calendar, X, ListFilter, Warehouse, Truck, Building2, Phone, SlidersHorizontal, ChevronDown } from 'lucide-react';
 
 export default function PickupFilterPanel({
@@ -255,6 +256,15 @@ export default function PickupFilterPanel({
   companies = []
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [serverSources, setServerSources] = useState([]);
+
+  // Server-filtered sources (Phase 1): the backend applies the source_products
+  // restriction, so the dropdown only ever shows sources the user may use.
+  useEffect(() => {
+    sourcesApi.getAll()
+      .then((res) => setServerSources(res.data || []))
+      .catch(() => setServerSources([]));
+  }, []);
 
   const hasActiveFilters = Boolean(
     filters.status || filters.source_id || filters.start_date || filters.end_date ||
@@ -285,18 +295,20 @@ export default function PickupFilterPanel({
     return dateVal;
   };
 
-  const mergedSources = [
-    ...depots.map((d) => ({
-      id: d.id || d._id,
-      name: d.name || d.depot_name,
-      type: 'Depot'
-    })),
-    ...companies.map((c) => ({
-      id: c.id,
-      name: c.name,
-      type: 'Company'
-    }))
-  ];
+  const mergedSources = serverSources.length > 0
+    ? serverSources
+    : [
+        ...depots.map((d) => ({
+          id: d.id || d._id,
+          name: d.name || d.depot_name,
+          type: 'Depot'
+        })),
+        ...companies.map((c) => ({
+          id: c.id,
+          name: c.name,
+          type: 'Company'
+        }))
+      ];
 
   return (
     <div className="bg-white p-4 border border-slate-200/80 rounded-xl shadow-sm flex flex-col gap-4 mb-4 transition-all duration-200">

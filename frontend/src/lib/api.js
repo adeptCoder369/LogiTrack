@@ -321,6 +321,18 @@ export const depotAccessApi = {
   getMyDepots: () => api.get('/depot-access/my-depots'),
 };
 
+// Sources (Phase 1): server-filtered source dropdowns + source<->product mapping
+export const sourcesApi = {
+  getAll: (type) => api.get('/sources', { params: { type } }),
+};
+
+export const sourceAccessApi = {
+  getAll: () => api.get('/source-access'),
+  getSource: (sourceType, sourceId) => api.get(`/source-access/source/${sourceType}/${sourceId}`),
+  updateSource: (sourceType, sourceId, productIds) =>
+    api.put(`/source-access/source/${sourceType}/${sourceId}`, { product_ids: productIds }),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),

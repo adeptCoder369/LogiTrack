@@ -12,7 +12,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent } from '../components/ui/card';
 import FilterPanel from '../components/purchaseOrder/FilterPanel';
-import { purchaseOrdersApi, productsApi, companiesApi, depotsApi, getFileUrl } from '../lib/api';
+import { purchaseOrdersApi, productsApi, companiesApi, depotsApi, getFileUrl, sourcesApi, productAccessApi } from '../lib/api';
 import { usePermissions } from '../lib/permissions';
 import { toast } from 'sonner';
 import { Plus, X, Pencil, CheckCircle, Download, FileText } from 'lucide-react';
@@ -28,6 +28,7 @@ export default function PurchaseOrders() {
   const [products, setProducts] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [depots, setDepots] = useState([]);
+  const [sourceCompanies, setSourceCompanies] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,17 +84,19 @@ export default function PurchaseOrders() {
 
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, companiesRes, depotsRes] = await Promise.all([
+      const [ordersRes, productsRes, companiesRes, depotsRes, sourceCompaniesRes] = await Promise.all([
         purchaseOrdersApi.getAll(),
-        productsApi.getAll(),
+        productAccessApi.getMyProducts(),
         companiesApi.getAll(),
-        depotsApi.getAll()
+        sourcesApi.getAll('Depot'),
+        sourcesApi.getAll('Company')
       ]);
 
       setOrders(ordersRes.data);
-      setProducts(productsRes.data);
+      setProducts(productsRes.data?.assigned_products || []);
       setCompanies(companiesRes.data);
       setDepots(depotsRes.data);
+      setSourceCompanies(sourceCompaniesRes.data);
     } catch {
       toast.error('Failed to load data');
     } finally {
@@ -265,8 +268,8 @@ export default function PurchaseOrders() {
     setSelectedItem(item);
 
     setFormData({
-      depot_id: item.depot_id || '',
-      depot_name: item.depot_name || '',
+      depot_id: item.source_id || item.depot_id || '',
+      depot_name: item.source_name || item.depot_name || '',
       source_type: item.source_type || 'Depot',
       to_company_id: item.to_company_id || '',
       to_company_name: item.to_company_name || '',
@@ -295,7 +298,7 @@ export default function PurchaseOrders() {
   };
 
   const handleCompanyChange = (id) => {
-    const c = companies.find(x => x.id === id);
+    const c = sourceCompanies.find(x => x.id === id) || companies.find(x => x.id === id);
     setFormData({
       ...formData,
       depot_id: id,
@@ -991,7 +994,7 @@ export default function PurchaseOrders() {
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  {companies.map(c => (
+                  {sourceCompanies.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>

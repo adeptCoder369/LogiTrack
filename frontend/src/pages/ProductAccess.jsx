@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { productsApi, usersApi } from '../lib/api';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { productsApi, usersApi, sourceAccessApi } from '../lib/api';
 import { toast } from 'sonner';
-import { Package, Users, Shield, Search, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { Package, Users, Shield, Search, ChevronDown, ChevronUp, RefreshCw, Building2, CheckSquare, Save } from 'lucide-react';
 import { Input } from '../components/ui/input';
 
-export default function ProductAccess() {
+// ============================== PRODUCT ACCESS TAB ==============================
+
+function ProductsAccessTab() {
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,30 +88,25 @@ export default function ProductAccess() {
 
   if (loading) {
     return (
-      <PageLayout title="Product Access" subtitle="Loading...">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-pulse text-slate-400">Loading...</div>
-        </div>
-      </PageLayout>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-pulse text-slate-400">Loading...</div>
+      </div>
     );
   }
 
   return (
-    <PageLayout
-      title="Product Access"
-      subtitle="View which users have access to each product (manage access from User Management)"
-      actions={
-        <Button variant="outline" onClick={fetchData}>
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex-1">
+          <p className="text-sm text-blue-800">
+            <strong>Read-only view.</strong> To assign or revoke product access, go to{' '}
+            <strong>User Management</strong> and edit the user's product assignments.
+          </p>
+        </div>
+        <Button variant="outline" onClick={fetchData} className="ml-4">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>
-      }
-    >
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm text-blue-800">
-          <strong>Read-only view.</strong> To assign or revoke product access, go to{' '}
-          <strong>User Management</strong> and edit the user's product assignments.
-        </p>
       </div>
 
       <div className="mb-6">
@@ -253,6 +251,239 @@ export default function ProductAccess() {
           </CardContent>
         </Card>
       )}
+    </>
+  );
+}
+
+// ============================== SOURCE ACCESS TAB ==============================
+
+function SourceAccessTab() {
+  const [data, setData] = useState(null); // { sources, products }
+  const [loading, setLoading] = useState(true);
+  const [selectedSource, setSelectedSource] = useState(null);
+  const [checked, setChecked] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const load = async () => {
+    try {
+      const res = await sourceAccessApi.getAll();
+      setData(res.data);
+    } catch (error) {
+      toast.error('Failed to load source access');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const openEditor = (source) => {
+    setSelectedSource(source);
+    setChecked(source.product_ids || []);
+  };
+
+  const toggleProduct = (id) => {
+    setChecked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await sourceAccessApi.updateSource(selectedSource.source_type, selectedSource.source_id, checked);
+      toast.success('Source access updated');
+      await load();
+      setSelectedSource(null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save source access');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredSources = (data?.sources || []).filter(s =>
+    s.source_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.source_type?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const mappedCount = (data?.sources || []).filter(s => (s.product_ids || []).length > 0).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-pulse text-slate-400">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Source list */}
+      <div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <p className="text-sm text-blue-800">
+            <strong>Which products can each source supply?</strong> A source with no mappings stays
+            visible to everyone; once mapped, it is only visible to users who can access at least one
+            of its mapped products.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <Building2 className="w-8 h-8 text-blue-500" />
+                <div>
+                  <p className="text-2xl font-bold">{(data?.sources || []).length}</p>
+                  <p className="text-sm text-gray-500">Total Sources</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <CheckSquare className="w-8 h-8 text-green-500" />
+                <div>
+                  <p className="text-2xl font-bold">{mappedCount}</p>
+                  <p className="text-sm text-gray-500">Mapped Sources</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="relative w-full mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search sources..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          {filteredSources.map((source) => (
+            <Card
+              key={`${source.source_type}-${source.source_id}`}
+              className={`cursor-pointer transition-colors ${selectedSource?.source_id === source.source_id ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'}`}
+              onClick={() => openEditor(source)}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 ${source.source_type === 'Depot' ? 'bg-slate-800 text-white' : 'bg-blue-600 text-white'}`}>
+                    {source.source_type}
+                  </span>
+                  <p className="font-medium truncate">{source.source_name}</p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${(source.product_ids || []).length > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {(source.product_ids || []).length} product{(source.product_ids || []).length === 1 ? '' : 's'}
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+          {filteredSources.length === 0 && (
+            <Card>
+              <CardContent className="py-10 text-center text-slate-400 text-sm">
+                No sources found.
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Editor */}
+      <div>
+        {selectedSource ? (
+          <Card className="sticky top-4">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${selectedSource.source_type === 'Depot' ? 'bg-slate-800 text-white' : 'bg-blue-600 text-white'}`}>
+                      {selectedSource.source_type}
+                    </span>
+                    {selectedSource.source_name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Select the products this source can supply. Uncheck everything to leave it unrestricted.
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedSource(null)}>Close</Button>
+              </div>
+
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                {(data?.products || []).map((product) => {
+                  const isChecked = checked.includes(product.id);
+                  return (
+                    <label
+                      key={product.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${isChecked ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleProduct(product.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{product.product_name}</p>
+                        {product.product_code && (
+                          <p className="text-xs text-gray-500 font-mono">{product.product_code}</p>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t pt-4">
+                <p className="text-xs text-gray-500">
+                  {checked.length} product{checked.length === 1 ? '' : 's'} mapped
+                </p>
+                <Button onClick={save} disabled={saving} className="bg-green-600 hover:bg-green-700">
+                  <Save className="w-4 h-4 mr-2" />
+                  {saving ? 'Saving...' : 'Save Mapping'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="py-16 text-center text-slate-400">
+              <Building2 className="w-12 h-12 mx-auto mb-4 opacity-40" />
+              <p className="text-sm">Select a source on the left to edit its product mapping.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================== PAGE ==============================
+
+export default function ProductAccess() {
+  return (
+    <PageLayout
+      title="Product & Source Access"
+      subtitle="Control which products users can see, and which products each source can supply"
+    >
+      <Tabs defaultValue="products">
+        <TabsList className="mb-6">
+          <TabsTrigger value="products">Product Access</TabsTrigger>
+          <TabsTrigger value="sources">Source Access</TabsTrigger>
+        </TabsList>
+        <TabsContent value="products">
+          <ProductsAccessTab />
+        </TabsContent>
+        <TabsContent value="sources">
+          <SourceAccessTab />
+        </TabsContent>
+      </Tabs>
     </PageLayout>
   );
 }

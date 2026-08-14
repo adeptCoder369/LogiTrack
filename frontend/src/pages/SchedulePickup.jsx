@@ -13,7 +13,7 @@ import {
   SelectValue
 } from "../components/ui/select";
 
-import { pickupApi, trucksApi, transportersApi, companiesApi, depotsApi } from "../lib/api";
+import { pickupApi, trucksApi, transportersApi, sourcesApi } from "../lib/api";
 import { usePermissions } from "../lib/permissions";
 import { useAuth } from "../lib/auth";
 import { toast } from "sonner";
@@ -349,8 +349,8 @@ company_id: currentUser?.role === "Transporter" ? (mappedCompanyIds[0] || "") : 
     const [truckRes, transporterRes, companyRes, depotRes] = await Promise.all([
       trucksApi.getAll(),
       transportersApi.getAll(),
-      companiesApi.getAll(),
-      depotsApi.getAll()
+      sourcesApi.getAll('Company'),
+      sourcesApi.getAll('Depot')
     ]);
 
     setTrucks(truckRes.data || []);
