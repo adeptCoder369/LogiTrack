@@ -1,5 +1,5 @@
 """Depot and Depot Inventory routes"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 
 from .db_compat import db
@@ -7,6 +7,19 @@ from auth_utils import get_current_user, check_permission, get_user_depot_ids, b
 from models import Depot, DepotCreate
 
 router = APIRouter(tags=["Depots"])
+
+
+def _resolve_depot_company(current_user: dict, data: DepotCreate, existing: Optional[dict] = None) -> Optional[str]:
+    """Every depot belongs to a company. Master admin may leave it unset
+    (legacy depots stay NULL until assigned); everyone else must supply one,
+    falling back to their own company."""
+    if current_user.get("is_master_admin"):
+        return data.company_id or (existing or {}).get("company_id")
+
+    company_id = data.company_id or current_user.get("company_id")
+    if not company_id:
+        raise HTTPException(status_code=400, detail="A depot must belong to a company (company_id is required)")
+    return company_id
 
 
 def resolve_txn_date(date_val, time_val, fallback=None):
@@ -26,43 +39,74 @@ def resolve_txn_date(date_val, time_val, fallback=None):
 @router.post("/depots", response_model=Depot)
 async def create_depot(data: DepotCreate, current_user: dict = Depends(get_current_user)):
     await check_permission(current_user, "Depots (Create)")
-    depot = Depot(**data.model_dump())
+    company_id = _resolve_depot_company(current_user, data)
+    if company_id and not await db.companies.find_one({"id": company_id}):
+        raise HTTPException(status_code=400, detail="Unknown company")
+    depot_data = data.model_dump()
+    if company_id:
+        depot_data["company_id"] = company_id
+    depot = Depot(**depot_data)
     await db.depots.insert_one(depot.model_dump())
     return depot
 
 @router.get("/depots", response_model=List[Depot])
 async def get_depots(current_user: dict = Depends(get_current_user)):
-    """Get all depots - filtered by user's depot access"""
+    """Get all depots - filtered by company ownership + user's depot access"""
     await check_permission(current_user, "Depots (View)")
     depot_ids = await get_user_depot_ids(current_user)
 
     if depot_ids is None:
+        # Master admin: platform-level visibility
         return await db.depots.find({}, {"_id": 0}).to_list(1000)
 
-    if not depot_ids:
+    or_branches = []
+    if current_user.get("company_id"):
+        or_branches.append({"company_id": current_user["company_id"]})
+    if depot_ids:
+        or_branches.append({"id": {"$in": depot_ids}})
+
+    if not or_branches:
         return []
 
-    return await db.depots.find({"id": {"$in": depot_ids}}, {"_id": 0}).to_list(1000)
+    return await db.depots.find({"$or": or_branches}, {"_id": 0}).to_list(1000)
 
 @router.get("/depots/{depot_id}", response_model=Depot)
 async def get_depot(depot_id: str, current_user: dict = Depends(get_current_user)):
-    """Get a specific depot - checks user's depot access"""
-    from fastapi import HTTPException
+    """Get a specific depot - checks company ownership + user's depot access"""
     await check_permission(current_user, "Depots (View)")
-    depot_ids = await get_user_depot_ids(current_user)
-
-    if depot_ids is not None and depot_id not in depot_ids:
-        raise HTTPException(status_code=403, detail="You don't have access to this depot")
 
     depot = await db.depots.find_one({"id": depot_id}, {"_id": 0})
     if not depot:
         raise HTTPException(status_code=404, detail="Depot not found")
+
+    depot_ids = await get_user_depot_ids(current_user)
+    owned = bool(depot.get("company_id")) and depot.get("company_id") == current_user.get("company_id")
+    if depot_ids is not None and depot_id not in depot_ids and not owned:
+        raise HTTPException(status_code=403, detail="You don't have access to this depot")
+
     return depot
 
 @router.put("/depots/{depot_id}", response_model=Depot)
 async def update_depot(depot_id: str, data: DepotCreate, current_user: dict = Depends(get_current_user)):
     await check_permission(current_user, "Depots (Update)")
-    await db.depots.update_one({"id": depot_id}, {"$set": data.model_dump()})
+
+    existing = await db.depots.find_one({"id": depot_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Depot not found")
+
+    depot_ids = await get_user_depot_ids(current_user)
+    owned = bool(existing.get("company_id")) and existing.get("company_id") == current_user.get("company_id")
+    if depot_ids is not None and depot_id not in depot_ids and not owned:
+        raise HTTPException(status_code=403, detail="You don't have access to this depot")
+
+    company_id = _resolve_depot_company(current_user, data, existing)
+    if company_id and company_id != existing.get("company_id") and not await db.companies.find_one({"id": company_id}):
+        raise HTTPException(status_code=400, detail="Unknown company")
+
+    update_data = data.model_dump()
+    if company_id:
+        update_data["company_id"] = company_id
+    await db.depots.update_one({"id": depot_id}, {"$set": update_data})
     return await db.depots.find_one({"id": depot_id}, {"_id": 0})
 
 @router.delete("/depots/{depot_id}")

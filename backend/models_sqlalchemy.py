@@ -234,6 +234,7 @@ class Depot(Base):
     __tablename__ = 'depots'
     id = Column(VARCHAR(36), primary_key=True)
     tenant_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36))
     name = Column(VARCHAR(255), nullable=False)
     location = Column(VARCHAR(255))
     city = Column(VARCHAR(100))
@@ -247,6 +248,7 @@ class Depot(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_name', 'name'),
+        Index('idx_company', 'company_id'),
         Index('idx_tenant', 'tenant_id'),
     )
 

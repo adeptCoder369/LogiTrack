@@ -252,6 +252,7 @@ class Product(ProductBase):
 
 class DepotBase(BaseModel):
     name: str
+    company_id: Optional[str] = None
     location: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None

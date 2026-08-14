@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { depotsApi, usersApi } from '../lib/api';
+import { depotsApi, usersApi, companiesApi } from '../lib/api';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { DepotDataTable } from '@/components/depots/DataTable';
@@ -21,8 +21,18 @@ export default function Depots() {
   const [depots, setDepots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const columns = [
     { key: 'name', label: 'Depot Name' },
+    {
+      key: 'company_id',
+      label: 'Owning Company',
+      render: (v) => {
+        if (!v) return <span className="text-slate-400">Unassigned</span>;
+        const company = companies.find((c) => c.id === v);
+        return company ? company.name : v;
+      },
+    },
     { key: 'city', label: 'City' },
     { key: 'state', label: 'State' },
     { key: 'warehouse_type', label: 'Type' },
@@ -68,6 +78,7 @@ export default function Depots() {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    company_id: '',
     location: '',
     city: '',
     district: '',
@@ -101,6 +112,12 @@ export default function Depots() {
       } catch (e) {
         // ignore
       }
+      try {
+        const cres = await companiesApi.getAll();
+        setCompanies(cres.data || []);
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       toast.error('Failed to load depots');
     } finally {
@@ -112,6 +129,7 @@ export default function Depots() {
     setSelectedItem(null);
     setFormData({
       name: '',
+      company_id: '',
       location: '',
       city: '',
       district: '',
@@ -137,6 +155,7 @@ export default function Depots() {
     setSelectedItem(item);
     setFormData({
       name: item.name || '',
+      company_id: item.company_id || '',
       location: item.location || '',
       city: item.city || '',
       district: item.district || '',
@@ -165,6 +184,10 @@ export default function Depots() {
   const handleSubmit = async () => {
     if (!formData.name) {
       toast.error('Depot name is required');
+      return;
+    }
+    if (!formData.company_id) {
+      toast.error('A depot must belong to a company — select the owning company');
       return;
     }
     setSaving(true);
@@ -251,6 +274,23 @@ export default function Depots() {
               placeholder="Enter depot name"
               data-testid="depot-name-input"
             />
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="company_id">Owning Company *</Label>
+            <Select
+              value={formData.company_id}
+              onValueChange={(value) => setFormData({ ...formData, company_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-400 mt-1">Legacy depots without an owner can be assigned here.</p>
           </div>
           <div>
             <Label htmlFor="warehouse_type">Warehouse Type</Label>
