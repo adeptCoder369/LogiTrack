@@ -621,3 +621,42 @@ class SourceProduct(Base):
         Index('idx_source', 'source_type', 'source_id'),
         Index('idx_product', 'product_id'),
     )
+
+
+class ProductOverride(Base):
+    __tablename__ = 'product_overrides'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36), nullable=False)
+    product_id = Column(VARCHAR(36), nullable=False)
+    code = Column(VARCHAR(100))
+    name = Column(VARCHAR(255))
+    description = Column(Text)
+    min_stock = Column(Float, default=0)
+    pricing_model = Column(VARCHAR(50))
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_company_product', 'tenant_id', 'company_id', 'product_id', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_product', 'product_id'),
+    )
+
+
+class CompanyPricing(Base):
+    __tablename__ = 'company_pricing'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36), nullable=False)
+    product_id = Column(VARCHAR(36), nullable=False)
+    tier = Column(VARCHAR(100))
+    rate = Column(Float, nullable=False)
+    currency = Column(VARCHAR(10), default='INR')
+    valid_from = Column(VARCHAR(50))
+    valid_to = Column(VARCHAR(50))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_company_product', 'company_id', 'product_id'),
+        Index('idx_product', 'product_id'),
+    )

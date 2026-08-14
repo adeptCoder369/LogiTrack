@@ -333,6 +333,19 @@ export const sourceAccessApi = {
     api.put(`/source-access/source/${sourceType}/${sourceId}`, { product_ids: productIds }),
 };
 
+// Product master overrides + company pricing (Phase 1)
+export const productManagementApi = {
+  getOverrides: (companyId) => api.get('/product-overrides', { params: { company_id: companyId } }),
+  upsertOverride: (productId, data) => api.put(`/product-overrides/${productId}`, data),
+  deleteOverride: (productId, companyId) =>
+    api.delete(`/product-overrides/${productId}`, { params: { company_id: companyId } }),
+  getEffective: (productId, companyId) => api.get(`/products/${productId}/effective`, { params: { company_id: companyId } }),
+  getPricing: (companyId, productId) => api.get('/company-pricing', { params: { company_id: companyId, product_id: productId } }),
+  createPricing: (data) => api.post('/company-pricing', data),
+  updatePricing: (id, data) => api.put(`/company-pricing/${id}`, data),
+  deletePricing: (id) => api.delete(`/company-pricing/${id}`),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),

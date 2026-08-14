@@ -111,6 +111,8 @@ class DbCompat:
         'railway_sidings': sql_models.RailwaySiding,
         'reports': sql_models.Report,
         'source_products': sql_models.SourceProduct,
+        'product_overrides': sql_models.ProductOverride,
+        'company_pricing': sql_models.CompanyPricing,
     }
 
     def __getattr__(self, name):
