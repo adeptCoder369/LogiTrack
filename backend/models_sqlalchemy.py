@@ -235,6 +235,7 @@ class Depot(Base):
     id = Column(VARCHAR(36), primary_key=True)
     tenant_id = Column(VARCHAR(36), nullable=False)
     company_id = Column(VARCHAR(36))
+    location_id = Column(VARCHAR(36))
     name = Column(VARCHAR(255), nullable=False)
     location = Column(VARCHAR(255))
     city = Column(VARCHAR(100))
@@ -249,6 +250,7 @@ class Depot(Base):
     __table_args__ = (
         Index('idx_name', 'name'),
         Index('idx_company', 'company_id'),
+        Index('idx_location', 'location_id'),
         Index('idx_tenant', 'tenant_id'),
     )
 
@@ -659,4 +661,31 @@ class CompanyPricing(Base):
         Index('idx_tenant', 'tenant_id'),
         Index('idx_company_product', 'company_id', 'product_id'),
         Index('idx_product', 'product_id'),
+    )
+
+
+class Region(Base):
+    __tablename__ = 'regions'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
+    code = Column(VARCHAR(50))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+    )
+
+
+class Location(Base):
+    __tablename__ = 'locations'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    region_id = Column(VARCHAR(36))
+    name = Column(VARCHAR(255), nullable=False)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_region', 'region_id'),
     )

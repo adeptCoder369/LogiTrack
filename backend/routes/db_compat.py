@@ -113,6 +113,8 @@ class DbCompat:
         'source_products': sql_models.SourceProduct,
         'product_overrides': sql_models.ProductOverride,
         'company_pricing': sql_models.CompanyPricing,
+        'regions': sql_models.Region,
+        'locations': sql_models.Location,
     }
 
     def __getattr__(self, name):

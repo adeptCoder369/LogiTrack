@@ -346,6 +346,25 @@ export const productManagementApi = {
   deletePricing: (id) => api.delete(`/company-pricing/${id}`),
 };
 
+// Regions & Locations (Phase 2: region > location > depot)
+export const regionsApi = {
+  getAll: () => api.get('/regions'),
+  getOne: (id) => api.get(`/regions/${id}`),
+  create: (data) => api.post('/regions', data),
+  update: (id, data) => api.put(`/regions/${id}`, data),
+  delete: (id) => api.delete(`/regions/${id}`),
+};
+
+export const locationsApi = {
+  getAll: () => api.get('/locations'),
+  getOne: (id) => api.get(`/locations/${id}`),
+  create: (data) => api.post('/locations', data),
+  update: (id, data) => api.put(`/locations/${id}`, data),
+  delete: (id) => api.delete(`/locations/${id}`),
+  getTree: () => api.get('/locations/tree'),
+  getOverview: (id) => api.get(`/locations/${id}/overview`),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),

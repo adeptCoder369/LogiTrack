@@ -39,6 +39,7 @@ import RailwayZones from "./pages/RailwayZones";
 import VerifiedTruckDetailsPage from "./pages/VerifiedTruckDetails";
 import Downloads from "./pages/Downloads";
 import Tenants from "./pages/Tenants";
+import RegionsAndLocations from "./pages/RegionsAndLocations";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -263,6 +264,12 @@ function AppRoutes() {
       <Route path="/tenants" element={
         <ProtectedRoute permission="Tenants (View)" masterOnly>
           <AppLayout><Tenants /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/regions-locations" element={
+        <ProtectedRoute permission="Locations (View)">
+          <AppLayout><RegionsAndLocations /></AppLayout>
         </ProtectedRoute>
       } />
 

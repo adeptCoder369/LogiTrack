@@ -39,6 +39,7 @@ const ROUTE_TO_PERMISSION = {
   '/purchase-orders': 'Purchase Orders (View)',
   '/downloads': 'Downloads (View)',
   '/tenants': 'Tenants (View)',
+  '/regions-locations': 'Locations (View)',
 };
 
 // Map actions to permission keys

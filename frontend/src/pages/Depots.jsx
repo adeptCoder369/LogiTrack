@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { depotsApi, usersApi, companiesApi } from '../lib/api';
+import { depotsApi, usersApi, companiesApi, regionsApi, locationsApi } from '../lib/api';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { DepotDataTable } from '@/components/depots/DataTable';
@@ -22,6 +22,8 @@ export default function Depots() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [regions, setRegions] = useState([]);
+  const [locations, setLocations] = useState([]);
   const columns = [
     { key: 'name', label: 'Depot Name' },
     {
@@ -79,6 +81,7 @@ export default function Depots() {
   const [formData, setFormData] = useState({
     name: '',
     company_id: '',
+    location_id: '',
     location: '',
     city: '',
     district: '',
@@ -118,6 +121,16 @@ export default function Depots() {
       } catch (e) {
         // ignore
       }
+      try {
+        const [regionsRes, locationsRes] = await Promise.all([
+          regionsApi.getAll(),
+          locationsApi.getAll()
+        ]);
+        setRegions(regionsRes.data || []);
+        setLocations(locationsRes.data || []);
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       toast.error('Failed to load depots');
     } finally {
@@ -130,6 +143,7 @@ export default function Depots() {
     setFormData({
       name: '',
       company_id: '',
+      location_id: '',
       location: '',
       city: '',
       district: '',
@@ -156,6 +170,7 @@ export default function Depots() {
     setFormData({
       name: item.name || '',
       company_id: item.company_id || '',
+      location_id: item.location_id || '',
       location: item.location || '',
       city: item.city || '',
       district: item.district || '',
@@ -291,6 +306,36 @@ export default function Depots() {
               </SelectContent>
             </Select>
             <p className="text-xs text-slate-400 mt-1">Legacy depots without an owner can be assigned here.</p>
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="location_id">Location</Label>
+            <Select
+              value={formData.location_id}
+              onValueChange={(value) => {
+                const loc = locations.find((l) => l.id === value);
+                const region = regions.find((r) => r.id === loc?.region_id);
+                setFormData({
+                  ...formData,
+                  location_id: value,
+                  location: loc ? (region ? `${region.name} — ${loc.name}` : loc.name) : ''
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select location (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((l) => {
+                  const region = regions.find((r) => r.id === l.region_id);
+                  return (
+                    <SelectItem key={l.id} value={l.id}>
+                      {region ? `${region.name} — ${l.name}` : l.name}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-400 mt-1">Part of the Region → Location → Depot hierarchy.</p>
           </div>
           <div>
             <Label htmlFor="warehouse_type">Warehouse Type</Label>
