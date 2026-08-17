@@ -88,6 +88,10 @@ class FakeCursor:
     def __init__(self, items=None):
         self.items = items or []
 
+    def sort(self, key, direction=1):
+        # db_compat cursors are chainable; order is not asserted in tests.
+        return self
+
     async def to_list(self, n=None):
         return self.items
 
@@ -148,6 +152,28 @@ class FakeCollection:
 
     async def count_documents(self, filter_dict=None):
         return len(self._filter(filter_dict or {}))
+
+    async def insert_one(self, doc):
+        self.rows.append(dict(doc))
+        return {"acknowledged": True, "inserted_id": doc.get("id")}
+
+    async def update_one(self, filter_dict, update_dict, upsert=False):
+        self.calls.append(("update_one", filter_dict, update_dict))
+        matched = self._filter(filter_dict or {})
+        for row in matched:
+            for k, v in (update_dict or {}).get("$set", {}).items():
+                row[k] = v
+        self.rowcount = 1 if matched else 0
+        return SimpleNamespace(matched_count=len(matched), modified_count=len(matched))
+
+    async def delete_one(self, filter_dict):
+        self.calls.append(("delete_one", filter_dict))
+        self.rowcount = 1
+        return SimpleNamespace(deleted_count=1)
+
+    async def delete_many(self, filter_dict):
+        self.calls.append(("delete_many", filter_dict))
+        return SimpleNamespace(deleted_count=len(self._filter(filter_dict or {})))
 
 
 class FakeDb:

@@ -99,7 +99,11 @@ async def create_purchase_order(
     # Create PO (source_id is authoritative; depot_id/depot_name mirror it so
     # legacy clients and the pickup/lifting flows keep working)
     order = PurchaseOrder(
-        **data.model_dump(exclude_none=True),
+        **data.model_dump(exclude_none=True, exclude={
+            "source_id", "source_name", "source_type",
+            "depot_id", "depot_name",
+            "billing_company_id", "billing_company_name",
+        }),
         po_number=po_number,
         source_id=source_id,
         source_name=source_name or data.depot_name or "",
