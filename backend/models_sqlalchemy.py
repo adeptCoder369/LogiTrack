@@ -838,3 +838,18 @@ class FirmAccess(Base):
         Index('idx_firm', 'firm_id'),
         Index('idx_user', 'user_id'),
     )
+
+
+class ClientModule(Base):
+    __tablename__ = 'client_modules'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36), nullable=False)
+    module = Column(VARCHAR(100), nullable=False)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_company_module', 'tenant_id', 'company_id', 'module', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_company', 'company_id'),
+    )

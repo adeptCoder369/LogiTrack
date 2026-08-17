@@ -13,6 +13,7 @@ from models import (
     CompanyUser, CompanyUserCreate,
     PurchaseOrder
 )
+from config import KNOWN_MODULES
 
 router = APIRouter(tags=["Companies"])
 
@@ -236,6 +237,66 @@ async def delete_company_factory(company_id: str, factory_id: str, current_user:
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Factory not found")
     return {"message": "Factory deleted"}
+
+# ============ CLIENT MODULES (Phase 2) ============
+
+class ClientModulesPayload(BaseModel):
+    modules: List[dict]  # [{"module": "invoices", "enabled": true}, ...]
+
+
+@router.get("/modules")
+async def get_module_catalog(current_user: dict = Depends(get_current_user)):
+    """The known module keys (drives the client modules UI)."""
+    await check_permission(current_user, "Companies (View)")
+    return {"modules": KNOWN_MODULES}
+
+
+@router.get("/companies/{company_id}/modules")
+async def get_company_modules(company_id: str, current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Companies (View)")
+    await _company_or_404(company_id)
+    rows = await db.client_modules.find({"company_id": company_id}, {"_id": 0}).to_list(1000)
+    return {"modules": rows, "known_modules": KNOWN_MODULES}
+
+
+@router.put("/companies/{company_id}/modules")
+async def update_company_modules(company_id: str, data: ClientModulesPayload, current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Companies (Update)")
+    await _company_or_404(company_id)
+
+    now = datetime.now(timezone.utc).isoformat()
+    submitted = {}
+    for entry in data.modules:
+        module = entry.get("module")
+        if not module:
+            continue
+        submitted[module] = bool(entry.get("enabled", True))
+
+    existing = await db.client_modules.find({"company_id": company_id}, {"_id": 0, "module": 1, "enabled": 1}).to_list(1000)
+    existing_map = {row["module"]: row for row in existing}
+
+    for module, enabled in submitted.items():
+        if module in existing_map:
+            await db.client_modules.update_one(
+                {"id": existing_map[module]["id"]},
+                {"$set": {"enabled": enabled}},
+            )
+        else:
+            await db.client_modules.insert_one({
+                "id": str(uuid.uuid4()),
+                "company_id": company_id,
+                "module": module,
+                "enabled": enabled,
+                "created_at": now,
+            })
+
+    # Deactivate modules removed from the submitted set.
+    for module, row in existing_map.items():
+        if module not in submitted:
+            await db.client_modules.update_one({"id": row["id"]}, {"$set": {"enabled": False}})
+
+    return await db.client_modules.find({"company_id": company_id}, {"_id": 0}).to_list(1000)
+
 
 # ============ COMPANY USERS ROUTES ============
 

@@ -137,6 +137,10 @@ export const companiesApi = {
   addFactory: (companyId, data) => api.post(`/companies/${companyId}/factories`, data),
   updateFactory: (companyId, factoryId, data) => api.put(`/companies/${companyId}/factories/${factoryId}`, data),
   deleteFactory: (companyId, factoryId) => api.delete(`/companies/${companyId}/factories/${factoryId}`),
+
+  // Client modules (Phase 2)
+  getModules: (companyId) => api.get(`/companies/${companyId}/modules`),
+  updateModules: (companyId, modules) => api.put(`/companies/${companyId}/modules`, { modules }),
 };
 
 // Transporters

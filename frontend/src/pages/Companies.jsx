@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { companiesApi, importApi, getFileUrl, productsApi } from '../lib/api';
 import { validators, formatters } from '../lib/validation';
 import { toast } from 'sonner';
-import { Plus, Upload, Download, Users, Building2, X, Edit, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
+import { Plus, Upload, Download, Users, Building2, X, Edit, Trash2, User, Phone, Mail, MapPin, Settings } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { usePermissions } from '../lib/permissions';
 import { Can } from '../components/Can';
@@ -95,6 +95,13 @@ export default function Companies() {
   const [officeForm, setOfficeForm] = useState({ name: '', office_type: 'Branch', is_head_office: false, city: '', state: '', contact_person: '', contact_mobile: '' });
   const [factoryForm, setFactoryForm] = useState({ factory_name: '', product_id: '', city: '', state: '' });
   const [orgSaving, setOrgSaving] = useState(false);
+
+  // Client modules state
+  const [modulesModalOpen, setModulesModalOpen] = useState(false);
+  const [modulesCompany, setModulesCompany] = useState(null);
+  const [modulesData, setModulesData] = useState({});
+  const [moduleCatalog, setModuleCatalog] = useState([]);
+  const [modulesSaving, setModulesSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -356,6 +363,41 @@ export default function Companies() {
       await loadOrgData(orgCompany.id);
     } catch (error) {
       toast.error('Failed to delete factory');
+    }
+  };
+
+  // Client Modules
+  const handleManageModules = async (company) => {
+    setModulesCompany(company);
+    setModulesModalOpen(true);
+    try {
+      const res = await companiesApi.getModules(company.id);
+      const map = {};
+      (res.data?.modules || []).forEach((m) => { map[m.module] = m.enabled; });
+      setModulesData(map);
+      setModuleCatalog(res.data?.known_modules || []);
+    } catch (error) {
+      toast.error('Failed to load client modules');
+    }
+  };
+
+  const toggleModule = (module) => {
+    setModulesData((prev) => ({ ...prev, [module]: !prev[module] }));
+  };
+
+  const saveModules = async () => {
+    setModulesSaving(true);
+    try {
+      await companiesApi.updateModules(
+        modulesCompany.id,
+        moduleCatalog.map((module) => ({ module, enabled: !!modulesData[module] }))
+      );
+      toast.success('Client modules updated');
+      setModulesModalOpen(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update modules');
+    } finally {
+      setModulesSaving(false);
     }
   };
 
@@ -681,6 +723,15 @@ export default function Companies() {
         >
           <Building2 className="w-4 h-4 mr-1" />
           Offices & Factories
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleManageModules(item)}
+          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+        >
+          <Settings className="w-4 h-4 mr-1" />
+          Modules
         </Button>
       </>
     );
@@ -1578,6 +1629,58 @@ export default function Companies() {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Client Modules Modal */}
+      {modulesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Client Modules</h2>
+                <p className="text-xs text-slate-500">{modulesCompany?.name}</p>
+              </div>
+              <button onClick={() => setModulesModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl font-mono p-1">✕</button>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-xs text-slate-500">
+                Enable modules for this client (phased module rollout). Route-level gating with these
+                flags lands in later phases.
+              </p>
+              {moduleCatalog.map((module) => (
+                <label
+                  key={module}
+                  className="flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors hover:bg-slate-50"
+                >
+                  <span className="text-sm font-medium text-slate-700 capitalize">{module.replace(/_/g, ' ')}</span>
+                  <input
+                    type="checkbox"
+                    checked={!!modulesData[module]}
+                    onChange={() => toggleModule(module)}
+                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                </label>
+              ))}
+              {moduleCatalog.length === 0 && (
+                <p className="text-xs text-slate-400">No modules defined yet.</p>
+              )}
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setModulesModalOpen(false)}
+                className="flex-1 py-2 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveModules}
+                disabled={modulesSaving}
+                className="flex-1 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-sm transition"
+              >
+                {modulesSaving ? 'Saving...' : 'Save Modules'}
+              </button>
             </div>
           </div>
         </div>

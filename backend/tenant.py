@@ -105,6 +105,29 @@ async def get_tenant_config(user: dict) -> dict:
     }
 
 
+async def client_module_enabled(company_id: Optional[str], key: str) -> bool:
+    """Per-client module flag with tenant-flag fallback (Phase 2).
+
+    Resolution order: client_modules row -> tenant feature_flags -> global
+    defaults (whitelist semantics: unknown = disabled). Company-less contexts
+    fall straight through to the tenant/global check.
+    """
+    if company_id:
+        from routes.db_compat import db as _db
+        row = await _db.client_modules.find_one({
+            "company_id": company_id, "module": key,
+        })
+        if row is not None:
+            return bool(row.get("enabled", True))
+
+    if _tenant_flags_var.get() is not None:
+        flags = _tenant_flags_var.get() or {}
+        if key in flags:
+            return bool(flags[key])
+
+    return bool(DEFAULT_FEATURE_FLAGS.get(key, False))
+
+
 def feature_enabled(key: str) -> bool:
     """Feature flag for the current tenant, falling back to global defaults.
 

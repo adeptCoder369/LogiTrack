@@ -48,6 +48,18 @@ if not JWT_SECRET:
     raise ValueError("JWT_SECRET environment variable is required")
 JWT_ALGORITHM = "HS256"
 
+# Known client modules (Phase 2). Route-level gating with these keys lands in
+# later phases; the catalog drives the client_modules management UI.
+KNOWN_MODULES = [
+    "invoices",
+    "payments",
+    "stock_transfers",
+    "leads",
+    "firms",
+    "reports",
+    "analytics",
+]
+
 # MSG91 Configuration
 MSG91_AUTHKEY = os.environ.get('MSG91_AUTHKEY', '')
 MSG91_TEMPLATE_ID = os.environ.get('MSG91_TEMPLATE_ID', '')
