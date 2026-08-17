@@ -378,3 +378,35 @@ async def build_source_exclusion_filter_async(user: dict, source_field: str = "s
     if not excluded:
         return {}
     return {source_field: {"$nin": excluded}}
+
+
+async def get_user_firm_granted_pairs(
+    user: dict,
+    firm_id: Optional[str] = None,
+    db=None,
+) -> List[dict]:
+    """Product x depot pairs a user is granted on a firm (Phase 2 data).
+
+    This is the "5 products, 3 depots -> 1 product & 2 depots" grant model:
+    a user's visibility within a firm is constrained to these pairs. Phase 3
+    (employees) wires this into source/product visibility; this helper only
+    reads the grants.
+
+    Master admin / Management are unrestricted -> returns None.
+    """
+    if user.get("is_master_admin") or user.get("role") == "Management":
+        return None
+
+    from routes.db_compat import db as _db
+    proxy = db or _db
+
+    query = {}
+    if firm_id:
+        query["firm_id"] = firm_id
+    query["user_id"] = user.get("id")
+    grants = await proxy.firm_access.find(query, {"_id": 0}).to_list(10000)
+
+    return [
+        {"firm_id": g.get("firm_id"), "product_id": g.get("product_id"), "depot_id": g.get("depot_id")}
+        for g in grants
+    ]

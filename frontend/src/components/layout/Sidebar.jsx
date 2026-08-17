@@ -31,7 +31,8 @@ import {
   Box,
   Download,
   Map,
-  Target
+  Target,
+  Network
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -53,6 +54,7 @@ const allNavItems = [
   { to: '/lifting-reports', icon: FileBarChart, label: 'Lifting Reports' },
   { to: '/companies', icon: Building2, label: 'Companies' },
   { to: '/leads', icon: Target, label: 'Leads' },
+  { to: '/firms', icon: Network, label: 'Firms' },
   { to: '/regions-locations', icon: Map, label: 'Regions & Locations' },
   { to: '/transporters', icon: TrainFront, label: 'Transporters' },
   { to: '/trucks', icon: Truck, label: 'Trucks' },

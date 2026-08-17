@@ -384,6 +384,24 @@ export const leadsApi = {
   convert: (id) => api.post(`/leads/${id}/convert`),
 };
 
+// Firms (Phase 2)
+export const firmsApi = {
+  getAll: () => api.get('/firms'),
+  getOne: (id) => api.get(`/firms/${id}`),
+  create: (data) => api.post('/firms', data),
+  update: (id, data) => api.put(`/firms/${id}`, data),
+  delete: (id) => api.delete(`/firms/${id}`),
+  getOffices: (firmId) => api.get(`/firms/${firmId}/offices`),
+  addOffice: (firmId, data) => api.post(`/firms/${firmId}/offices`, data),
+  deleteOffice: (firmId, officeId) => api.delete(`/firms/${firmId}/offices/${officeId}`),
+  getFactories: (firmId) => api.get(`/firms/${firmId}/factories`),
+  addFactory: (firmId, data) => api.post(`/firms/${firmId}/factories`, data),
+  deleteFactory: (firmId, factoryId) => api.delete(`/firms/${firmId}/factories/${factoryId}`),
+  getAccess: (firmId) => api.get(`/firms/${firmId}/access`),
+  grantAccess: (firmId, data) => api.post(`/firms/${firmId}/access`, data),
+  revokeAccess: (firmId, grantId) => api.delete(`/firms/${firmId}/access/${grantId}`),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),

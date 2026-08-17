@@ -211,4 +211,10 @@ PERMISSION_DEFAULTS = {
     "Leads (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Leads (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Leads (Convert)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+
+    # Firms (Phase 2)
+    "Firms (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Firms (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Firms (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Firms (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
 }

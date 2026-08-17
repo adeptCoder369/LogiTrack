@@ -22,6 +22,7 @@ from .sources import router as sources_router
 from .product_management import router as product_management_router
 from .locations import router as locations_router
 from .leads import router as leads_router
+from .firms import router as firms_router
 
 __all__ = [
     'reports_router', 'companies_router', 'transporters_router',
@@ -31,5 +32,5 @@ __all__ = [
     'depot_access_router', 'purchase_orders_router', 'pickups_router',
     'verified_trucks_router', 'company_inventory_router', 'tenants_router',
     'source_access_router', 'sources_router', 'product_management_router',
-    'locations_router', 'leads_router',
+    'locations_router', 'leads_router', 'firms_router',
 ]

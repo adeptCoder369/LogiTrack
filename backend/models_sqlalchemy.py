@@ -763,3 +763,78 @@ class Lead(Base):
         Index('idx_type', 'lead_type'),
         Index('idx_assigned', 'assigned_employee_id'),
     )
+
+
+class Firm(Base):
+    __tablename__ = 'firms'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
+    parent_firm_id = Column(VARCHAR(36))
+    company_id = Column(VARCHAR(36))
+    address = Column(Text)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    contact_person = Column(VARCHAR(255))
+    contact_mobile = Column(VARCHAR(50))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_parent', 'parent_firm_id'),
+        Index('idx_company', 'company_id'),
+    )
+
+
+class FirmOffice(Base):
+    __tablename__ = 'firm_offices'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    firm_id = Column(VARCHAR(36), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
+    office_type = Column(VARCHAR(50), default='Branch')
+    is_head_office = Column(Boolean, default=False)
+    address = Column(Text)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    contact_person = Column(VARCHAR(255))
+    contact_mobile = Column(VARCHAR(50))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_firm', 'firm_id'),
+    )
+
+
+class FirmFactory(Base):
+    __tablename__ = 'firm_factories'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    firm_id = Column(VARCHAR(36), nullable=False)
+    factory_name = Column(VARCHAR(255), nullable=False)
+    address = Column(Text)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    product_id = Column(VARCHAR(36), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_firm_product', 'tenant_id', 'firm_id', 'product_id', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_firm', 'firm_id'),
+    )
+
+
+class FirmAccess(Base):
+    __tablename__ = 'firm_access'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    firm_id = Column(VARCHAR(36), nullable=False)
+    user_id = Column(VARCHAR(36), nullable=False)
+    product_id = Column(VARCHAR(36), nullable=False)
+    depot_id = Column(VARCHAR(36), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_firm_user_pair', 'tenant_id', 'firm_id', 'user_id', 'product_id', 'depot_id', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_firm', 'firm_id'),
+        Index('idx_user', 'user_id'),
+    )
