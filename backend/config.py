@@ -204,4 +204,11 @@ PERMISSION_DEFAULTS = {
     "Locations (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Locations (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Locations (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+
+    # Leads (Phase 2)
+    "Leads (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Leads (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Leads (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Leads (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Leads (Convert)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
 }

@@ -735,3 +735,31 @@ class ClientFactory(Base):
         Index('idx_company', 'company_id'),
         Index('idx_product', 'product_id'),
     )
+
+
+class Lead(Base):
+    __tablename__ = 'leads'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    lead_type = Column(VARCHAR(20), nullable=False, default='Sales')
+    company_id = Column(VARCHAR(36))
+    company_name = Column(VARCHAR(255))
+    status = Column(VARCHAR(50), nullable=False, default='New')
+    parent_client_id = Column(VARCHAR(36))
+    assigned_employee_id = Column(VARCHAR(36))
+    assigned_employee_name = Column(VARCHAR(255))
+    contact_person = Column(VARCHAR(255))
+    contact_mobile = Column(VARCHAR(50))
+    notes = Column(Text)
+    assigned_products = Column(JSON)
+    assigned_depots = Column(JSON)
+    converted_company_id = Column(VARCHAR(36))
+    converted_at = Column(DateTime)
+    created_by = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_status', 'status'),
+        Index('idx_type', 'lead_type'),
+        Index('idx_assigned', 'assigned_employee_id'),
+    )

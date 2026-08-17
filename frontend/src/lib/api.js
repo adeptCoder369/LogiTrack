@@ -374,6 +374,16 @@ export const locationsApi = {
   getOverview: (id) => api.get(`/locations/${id}/overview`),
 };
 
+// Leads (Phase 2)
+export const leadsApi = {
+  getAll: (params) => api.get('/leads', { params }),
+  getOne: (id) => api.get(`/leads/${id}`),
+  create: (data) => api.post('/leads', data),
+  update: (id, data) => api.put(`/leads/${id}`, data),
+  delete: (id) => api.delete(`/leads/${id}`),
+  convert: (id) => api.post(`/leads/${id}/convert`),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),

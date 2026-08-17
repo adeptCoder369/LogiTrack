@@ -30,7 +30,8 @@ import {
   ShieldCheck,
   Box,
   Download,
-  Map
+  Map,
+  Target
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -51,6 +52,7 @@ const allNavItems = [
   { to: '/company-reports', icon: FileBarChart, label: 'Company Reports' },
   { to: '/lifting-reports', icon: FileBarChart, label: 'Lifting Reports' },
   { to: '/companies', icon: Building2, label: 'Companies' },
+  { to: '/leads', icon: Target, label: 'Leads' },
   { to: '/regions-locations', icon: Map, label: 'Regions & Locations' },
   { to: '/transporters', icon: TrainFront, label: 'Transporters' },
   { to: '/trucks', icon: Truck, label: 'Trucks' },

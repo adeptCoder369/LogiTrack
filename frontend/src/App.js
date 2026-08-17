@@ -40,6 +40,7 @@ import VerifiedTruckDetailsPage from "./pages/VerifiedTruckDetails";
 import Downloads from "./pages/Downloads";
 import Tenants from "./pages/Tenants";
 import RegionsAndLocations from "./pages/RegionsAndLocations";
+import Leads from "./pages/Leads";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -270,6 +271,12 @@ function AppRoutes() {
       <Route path="/regions-locations" element={
         <ProtectedRoute permission="Locations (View)">
           <AppLayout><RegionsAndLocations /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/leads" element={
+        <ProtectedRoute permission="Leads (View)">
+          <AppLayout><Leads /></AppLayout>
         </ProtectedRoute>
       } />
 
