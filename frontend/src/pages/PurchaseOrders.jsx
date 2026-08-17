@@ -66,6 +66,8 @@ export default function PurchaseOrders() {
     source_type: 'Depot',
     to_company_id: '',
     to_company_name: '',
+    billing_company_id: '',
+    billing_company_name: '',
     product_id: '',
     product_name: '',
     product_code: '',
@@ -273,6 +275,8 @@ export default function PurchaseOrders() {
       source_type: item.source_type || 'Depot',
       to_company_id: item.to_company_id || '',
       to_company_name: item.to_company_name || '',
+      billing_company_id: item.billing_company_id || '',
+      billing_company_name: item.billing_company_name || '',
       product_id: item.product_id || '',
       product_name: item.product_name || '',
       product_code: item.product_code || '',
@@ -1012,7 +1016,10 @@ export default function PurchaseOrders() {
                   setFormData({
                     ...formData,
                     to_company_id: id,
-                    to_company_name: c?.name || ''
+                    to_company_name: c?.name || '',
+                    // Default billing to the client unless one was chosen.
+                    billing_company_id: formData.billing_company_id || id,
+                    billing_company_name: formData.billing_company_name || c?.name || ''
                   });
                 }}
               >
@@ -1070,7 +1077,10 @@ export default function PurchaseOrders() {
                   setFormData({
                     ...formData,
                     to_company_id: id,
-                    to_company_name: c?.name || ''
+                    to_company_name: c?.name || '',
+                    // Default billing to the client unless one was chosen.
+                    billing_company_id: formData.billing_company_id || id,
+                    billing_company_name: formData.billing_company_name || c?.name || ''
                   });
                 }}
               >
@@ -1098,6 +1108,31 @@ export default function PurchaseOrders() {
               </Select>
             </div>
           )}
+
+          <div>
+            <Label>Billing Company {formData.source_type === 'Depot' ? '' : '*'}</Label>
+            <Select
+              value={formData.billing_company_id}
+              onValueChange={(id) => {
+                const c = companies.find(x => x.id === id);
+                setFormData({
+                  ...formData,
+                  billing_company_id: id,
+                  billing_company_name: c?.name || ''
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Defaults to client company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-400 mt-1">POs issued by a child client bill under this parent (defaults to the client itself).</p>
+          </div>
 
           <div>
             <Label>Product *</Label>

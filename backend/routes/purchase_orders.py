@@ -89,6 +89,13 @@ async def create_purchase_order(
     count = await db.purchase_orders.count_documents({})
     po_number = f"PO-{str(count + 1).zfill(6)}"
 
+    # Billing parent: PO issued by a child client bills under its parent.
+    billing_company_id = data.billing_company_id or data.to_company_id
+    billing_company_name = data.billing_company_name or ""
+    if billing_company_id and not billing_company_name:
+        billing_company = await db.companies.find_one({"id": billing_company_id})
+        billing_company_name = billing_company.get("name", "") if billing_company else ""
+
     # Create PO (source_id is authoritative; depot_id/depot_name mirror it so
     # legacy clients and the pickup/lifting flows keep working)
     order = PurchaseOrder(
@@ -99,6 +106,8 @@ async def create_purchase_order(
         source_type=source_type,
         depot_id=source_id,
         depot_name=source_name or data.depot_name or "",
+        billing_company_id=billing_company_id,
+        billing_company_name=billing_company_name,
         remaining_quantity_mt=data.total_quantity_mt,
         added_by=current_user["id"],
         added_by_name=current_user["name"]
@@ -195,6 +204,16 @@ async def update_purchase_order(
         "depot_id": source_id,
         "depot_name": source_name or data.depot_name or existing.get("depot_name") or "",
     })
+
+    # Billing parent (defaults to the client company / existing value).
+    effective_to_company = data.to_company_id or existing.get("to_company_id")
+    billing_company_id = data.billing_company_id or existing.get("billing_company_id") or effective_to_company
+    billing_company_name = data.billing_company_name or existing.get("billing_company_name") or ""
+    if billing_company_id and not billing_company_name:
+        billing_company = await db.companies.find_one({"id": billing_company_id})
+        billing_company_name = billing_company.get("name", "") if billing_company else ""
+    update_fields["billing_company_id"] = billing_company_id
+    update_fields["billing_company_name"] = billing_company_name
 
     await db.purchase_orders.update_one(
         {"id": order_id},

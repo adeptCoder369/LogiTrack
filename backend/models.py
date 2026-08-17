@@ -73,6 +73,8 @@ class UserLogin(BaseModel):
 
 class CompanyBase(BaseModel):
     name: str
+    entity_roles: List[str] = []
+    parent_client_id: Optional[str] = None
     trade_name: Optional[str] = None
     logo_file_id: Optional[str] = None
     location: Optional[str] = None
@@ -503,6 +505,8 @@ class PurchaseOrderBase(BaseModel):
     source_id: Optional[str] = None
     source_name: Optional[str] = None
     source_type: Optional[str] = "Depot"
+    billing_company_id: Optional[str] = None
+    billing_company_name: Optional[str] = None
     
     to_company_id: Optional[str] = None
     to_company_name: Optional[str] = None

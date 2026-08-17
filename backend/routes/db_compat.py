@@ -115,6 +115,8 @@ class DbCompat:
         'company_pricing': sql_models.CompanyPricing,
         'regions': sql_models.Region,
         'locations': sql_models.Location,
+        'client_offices': sql_models.ClientOffice,
+        'client_factories': sql_models.ClientFactory,
     }
 
     def __getattr__(self, name):

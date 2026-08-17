@@ -128,6 +128,15 @@ export const companiesApi = {
   // Purchase Orders
   getPurchaseOrders: (companyId) => api.get(`/companies/${companyId}/purchase-orders`),
 
+  // Offices & Factories (Phase 2)
+  getOffices: (companyId) => api.get(`/companies/${companyId}/offices`),
+  addOffice: (companyId, data) => api.post(`/companies/${companyId}/offices`, data),
+  updateOffice: (companyId, officeId, data) => api.put(`/companies/${companyId}/offices/${officeId}`, data),
+  deleteOffice: (companyId, officeId) => api.delete(`/companies/${companyId}/offices/${officeId}`),
+  getFactories: (companyId) => api.get(`/companies/${companyId}/factories`),
+  addFactory: (companyId, data) => api.post(`/companies/${companyId}/factories`, data),
+  updateFactory: (companyId, factoryId, data) => api.put(`/companies/${companyId}/factories/${factoryId}`, data),
+  deleteFactory: (companyId, factoryId) => api.delete(`/companies/${companyId}/factories/${factoryId}`),
 };
 
 // Transporters

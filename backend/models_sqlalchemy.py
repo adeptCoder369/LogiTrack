@@ -72,6 +72,8 @@ class Company(Base):
     __tablename__ = 'companies'
     id = Column(VARCHAR(36), primary_key=True)
     tenant_id = Column(VARCHAR(36), nullable=False)
+    entity_roles = Column(JSON)
+    parent_client_id = Column(VARCHAR(36))
     name = Column(VARCHAR(255), nullable=False)
     trade_name = Column(VARCHAR(255))
     logo_file_id = Column(VARCHAR(255))
@@ -107,6 +109,7 @@ class Company(Base):
     created_at = Column(DateTime, nullable=False)
     __table_args__ = (
         Index('idx_name', 'name'),
+        Index('idx_parent', 'parent_client_id'),
         Index('idx_tenant', 'tenant_id'),
     )
 
@@ -486,6 +489,8 @@ class PurchaseOrder(Base):
     source_type = Column(VARCHAR(50), default='Depot')
     to_company_id = Column(VARCHAR(36))
     to_company_name = Column(VARCHAR(255))
+    billing_company_id = Column(VARCHAR(36))
+    billing_company_name = Column(VARCHAR(255))
     product_id = Column(VARCHAR(36))
     product_name = Column(VARCHAR(255))
     product_code = Column(VARCHAR(100))
@@ -510,6 +515,7 @@ class PurchaseOrder(Base):
         Index('idx_product', 'product_id'),
         Index('idx_company', 'to_company_id'),
         Index('idx_source', 'source_id'),
+        Index('idx_billing_company', 'billing_company_id'),
         Index('idx_tenant', 'tenant_id'),
     )
 
@@ -688,4 +694,44 @@ class Location(Base):
     __table_args__ = (
         Index('idx_tenant', 'tenant_id'),
         Index('idx_region', 'region_id'),
+    )
+
+
+class ClientOffice(Base):
+    __tablename__ = 'client_offices'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
+    office_type = Column(VARCHAR(50), default='Branch')
+    is_head_office = Column(Boolean, default=False)
+    address = Column(Text)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    pin_code = Column(VARCHAR(20))
+    contact_person = Column(VARCHAR(255))
+    contact_mobile = Column(VARCHAR(50))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_company', 'company_id'),
+    )
+
+
+class ClientFactory(Base):
+    __tablename__ = 'client_factories'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36), nullable=False)
+    factory_name = Column(VARCHAR(255), nullable=False)
+    address = Column(Text)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    product_id = Column(VARCHAR(36), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_company_product', 'tenant_id', 'company_id', 'product_id', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_company', 'company_id'),
+        Index('idx_product', 'product_id'),
     )

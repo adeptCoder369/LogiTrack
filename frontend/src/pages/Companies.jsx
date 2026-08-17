@@ -11,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { companiesApi, importApi, getFileUrl } from '../lib/api';
+import { companiesApi, importApi, getFileUrl, productsApi } from '../lib/api';
 import { validators, formatters } from '../lib/validation';
 import { toast } from 'sonner';
 import { Plus, Upload, Download, Users, Building2, X, Edit, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
@@ -86,8 +86,20 @@ export default function Companies() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // Offices & Factories state
+  const [orgModalOpen, setOrgModalOpen] = useState(false);
+  const [orgCompany, setOrgCompany] = useState(null);
+  const [offices, setOffices] = useState([]);
+  const [factories, setFactories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [officeForm, setOfficeForm] = useState({ name: '', office_type: 'Branch', is_head_office: false, city: '', state: '', contact_person: '', contact_mobile: '' });
+  const [factoryForm, setFactoryForm] = useState({ factory_name: '', product_id: '', city: '', state: '' });
+  const [orgSaving, setOrgSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
+    entity_roles: [],
+    parent_client_id: '',
     trade_name: '',
     logo_file_id: null,
     location: '',
@@ -185,6 +197,8 @@ export default function Companies() {
     setSelectedItem(null);
     setFormData({
       name: '',
+      entity_roles: [],
+      parent_client_id: '',
       trade_name: '',
       logo_file_id: null,
       location: '',
@@ -220,6 +234,8 @@ export default function Companies() {
     setSelectedItem(item);
     setFormData({
       name: item.name || '',
+      entity_roles: item.entity_roles || [],
+      parent_client_id: item.parent_client_id || '',
       trade_name: item.trade_name || '',
       logo_file_id: item.logo_file_id || null,
       location: item.location || '',
@@ -261,6 +277,86 @@ export default function Companies() {
     setSelectedCompany(company);
     fetchCompanyUsers(company.id);
     setUsersModalOpen(true);
+  };
+
+  // Manage Offices & Factories
+  const loadOrgData = async (companyId) => {
+    try {
+      const [officesRes, factoriesRes, productsRes] = await Promise.all([
+        companiesApi.getOffices(companyId),
+        companiesApi.getFactories(companyId),
+        productsApi.getAll(),
+      ]);
+      setOffices(officesRes.data || []);
+      setFactories(factoriesRes.data || []);
+      setProducts(productsRes.data || []);
+    } catch (error) {
+      toast.error('Failed to load offices/factories');
+    }
+  };
+
+  const handleManageOrg = (company) => {
+    setOrgCompany(company);
+    setOfficeForm({ name: '', office_type: 'Branch', is_head_office: false, city: '', state: '', contact_person: '', contact_mobile: '' });
+    setFactoryForm({ factory_name: '', product_id: '', city: '', state: '' });
+    setOrgModalOpen(true);
+    loadOrgData(company.id);
+  };
+
+  const addOffice = async () => {
+    if (!officeForm.name) {
+      toast.error('Office name is required');
+      return;
+    }
+    setOrgSaving(true);
+    try {
+      await companiesApi.addOffice(orgCompany.id, officeForm);
+      toast.success('Office added');
+      setOfficeForm({ name: '', office_type: 'Branch', is_head_office: false, city: '', state: '', contact_person: '', contact_mobile: '' });
+      await loadOrgData(orgCompany.id);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to add office');
+    } finally {
+      setOrgSaving(false);
+    }
+  };
+
+  const deleteOffice = async (office) => {
+    try {
+      await companiesApi.deleteOffice(orgCompany.id, office.id);
+      toast.success('Office deleted');
+      await loadOrgData(orgCompany.id);
+    } catch (error) {
+      toast.error('Failed to delete office');
+    }
+  };
+
+  const addFactory = async () => {
+    if (!factoryForm.factory_name || !factoryForm.product_id) {
+      toast.error('Factory name and product are required');
+      return;
+    }
+    setOrgSaving(true);
+    try {
+      await companiesApi.addFactory(orgCompany.id, factoryForm);
+      toast.success('Factory added');
+      setFactoryForm({ factory_name: '', product_id: '', city: '', state: '' });
+      await loadOrgData(orgCompany.id);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to add factory');
+    } finally {
+      setOrgSaving(false);
+    }
+  };
+
+  const deleteFactory = async (factory) => {
+    try {
+      await companiesApi.deleteFactory(orgCompany.id, factory.id);
+      toast.success('Factory deleted');
+      await loadOrgData(orgCompany.id);
+    } catch (error) {
+      toast.error('Failed to delete factory');
+    }
   };
 
   const handleAddUser = () => {
@@ -562,20 +658,31 @@ export default function Companies() {
     }
   };
 
-  // Custom actions for data table - add "Manage Users" button
+  // Custom actions for data table - add "Manage Users" + "Offices" buttons
   const customActions = (item) => {
     if (!canViewUsers) return null;
 
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => handleManageUsers(item)}
-        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-      >
-        <Users className="w-4 h-4 mr-1" />
-        Users
-      </Button>
+      <>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleManageUsers(item)}
+          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+        >
+          <Users className="w-4 h-4 mr-1" />
+          Users
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleManageOrg(item)}
+          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+        >
+          <Building2 className="w-4 h-4 mr-1" />
+          Offices & Factories
+        </Button>
+      </>
     );
   };
 
@@ -666,6 +773,59 @@ export default function Companies() {
                   accept="image/*"
                   showCameraOption={false}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Entity Roles</Label>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {['Lead', 'Client', 'Company', 'Source'].map((role) => {
+                    const checked = (formData.entity_roles || []).includes(role);
+                    return (
+                      <label
+                        key={role}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                          checked ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="w-3.5 h-3.5"
+                          checked={checked}
+                          onChange={() => {
+                            const roles = formData.entity_roles || [];
+                            setFormData({
+                              ...formData,
+                              entity_roles: checked ? roles.filter(r => r !== role) : [...roles, role],
+                            });
+                          }}
+                        />
+                        {role}
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Multi-role allowed — a vendor can also be a client.</p>
+              </div>
+              <div>
+                <Label htmlFor="parent_client_id">Parent Client</Label>
+                <Select
+                  value={formData.parent_client_id}
+                  onValueChange={(value) => setFormData({ ...formData, parent_client_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="None (top-level)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies
+                      .filter(c => c.id !== (selectedItem?.id || ''))
+                      .filter(c => (c.entity_roles || []).includes('Client') || c.is_client)
+                      .map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-slate-400 mt-1">POs of this client bill under the parent.</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1282,6 +1442,146 @@ export default function Companies() {
         description={`Are you sure you want to delete "${selectedUser?.name}"?`}
         loading={saving}
       />
+
+      {/* Offices & Factories Modal */}
+      {orgModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Offices & Factories</h2>
+                <p className="text-xs text-slate-500">{orgCompany?.name}</p>
+              </div>
+              <button onClick={() => setOrgModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl font-mono p-1">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              {/* Offices */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">Offices</h3>
+                  <span className="text-xs text-slate-400">{offices.length} office(s)</span>
+                </div>
+                <div className="space-y-2 mb-3">
+                  {offices.map((office) => (
+                    <div key={office.id} className="flex items-center gap-3 bg-slate-50 rounded-lg px-4 py-2.5 border border-slate-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-800 text-sm">{office.name}</span>
+                          {office.is_head_office && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">HEAD OFFICE</span>
+                          )}
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{office.office_type}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">
+                          {[office.city, office.state].filter(Boolean).join(', ') || '—'}
+                          {office.contact_person ? ` • ${office.contact_person}${office.contact_mobile ? ` (${office.contact_mobile})` : ''}` : ''}
+                        </p>
+                      </div>
+                      <button onClick={() => deleteOffice(office)} className="text-slate-400 hover:text-rose-600 transition-colors" title="Delete office">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {offices.length === 0 && <p className="text-xs text-slate-400">No offices yet.</p>}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <Input
+                    value={officeForm.name}
+                    onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
+                    placeholder="Office name *"
+                    className="text-xs"
+                  />
+                  <select
+                    value={officeForm.office_type}
+                    onChange={(e) => setOfficeForm({ ...officeForm, office_type: e.target.value })}
+                    className="text-xs p-2 border rounded bg-white"
+                  >
+                    <option value="Head Office">Head Office</option>
+                    <option value="Branch">Branch</option>
+                  </select>
+                  <Input
+                    value={officeForm.city}
+                    onChange={(e) => setOfficeForm({ ...officeForm, city: e.target.value })}
+                    placeholder="City"
+                    className="text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      value={officeForm.contact_mobile}
+                      onChange={(e) => setOfficeForm({ ...officeForm, contact_mobile: e.target.value })}
+                      placeholder="Contact mobile"
+                      className="text-xs"
+                    />
+                    <Button size="sm" onClick={addOffice} disabled={orgSaving} className="shrink-0 bg-slate-900 hover:bg-slate-800">
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Factories */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">Factories</h3>
+                  <span className="text-xs text-slate-400">max 1 factory per product</span>
+                </div>
+                <div className="space-y-2 mb-3">
+                  {factories.map((factory) => {
+                    const product = products.find((p) => p.id === factory.product_id);
+                    return (
+                      <div key={factory.id} className="flex items-center gap-3 bg-slate-50 rounded-lg px-4 py-2.5 border border-slate-100">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-800 text-sm">{factory.factory_name}</span>
+                            {product && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">{product.product_name}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 truncate">
+                            {[factory.city, factory.state].filter(Boolean).join(', ') || '—'}
+                          </p>
+                        </div>
+                        <button onClick={() => deleteFactory(factory)} className="text-slate-400 hover:text-rose-600 transition-colors" title="Delete factory">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {factories.length === 0 && <p className="text-xs text-slate-400">No factories yet.</p>}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <Input
+                    value={factoryForm.factory_name}
+                    onChange={(e) => setFactoryForm({ ...factoryForm, factory_name: e.target.value })}
+                    placeholder="Factory name *"
+                    className="text-xs"
+                  />
+                  <select
+                    value={factoryForm.product_id}
+                    onChange={(e) => setFactoryForm({ ...factoryForm, product_id: e.target.value })}
+                    className="text-xs p-2 border rounded bg-white"
+                  >
+                    <option value="">Product *</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.product_name}</option>
+                    ))}
+                  </select>
+                  <Input
+                    value={factoryForm.city}
+                    onChange={(e) => setFactoryForm({ ...factoryForm, city: e.target.value })}
+                    placeholder="City"
+                    className="text-xs"
+                  />
+                  <Button size="sm" onClick={addFactory} disabled={orgSaving} className="bg-slate-900 hover:bg-slate-800">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Factory
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 }
