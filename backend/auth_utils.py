@@ -74,6 +74,7 @@ async def load_user_by_id(user_id: str) -> dict:
             "otp_verified": user.otp_verified,
             "password_set": user.password_set,
             "is_master_admin": user.is_master_admin,
+            "employee_id": user.employee_id,
         }
 
 

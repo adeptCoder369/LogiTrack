@@ -389,6 +389,7 @@ async def login(data: UserLogin):
         "otp_verified": user.otp_verified,
         "password_set": user.password_set,
         "is_master_admin": user.is_master_admin,
+        "employee_id": user.employee_id,
     }
     token = create_token(user.__dict__)
     return {"token": token, "user": user_response}
@@ -446,6 +447,7 @@ async def first_time_setup(data: FirstTimeSetupRequest):
         "otp_verified": True,
         "password_set": True,
         "is_master_admin": updated_user.is_master_admin,
+        "employee_id": updated_user.employee_id,
     }
     token = create_token(updated_user.__dict__)
     return {"token": token, "user": user_response}
@@ -504,6 +506,7 @@ async def verify_login_otp(request: VerifyOTPRequest):
         "otp_verified": user.otp_verified,
         "password_set": user.password_set,
         "is_master_admin": user.is_master_admin,
+        "employee_id": user.employee_id,
     }
     token = create_token(user.__dict__)
     async with AsyncSessionLocal() as session:
@@ -745,6 +748,7 @@ async def get_users(current_user: dict = Depends(get_current_user)):
                 "otp_verified": u.otp_verified,
                 "password_set": u.password_set,
                 "is_master_admin": u.is_master_admin,
+                "employee_id": u.employee_id,
                 "created_by": u.created_by,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
             }
