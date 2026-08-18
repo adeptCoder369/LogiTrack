@@ -55,6 +55,8 @@ const allNavItems = [
   { to: '/companies', icon: Building2, label: 'Companies' },
   { to: '/leads', icon: Target, label: 'Leads' },
   { to: '/firms', icon: Network, label: 'Firms' },
+  { to: '/employees', icon: Users, label: 'Employees' },
+  { to: '/departments-designations', icon: Settings, label: 'Depts & Designations' },
   { to: '/regions-locations', icon: Map, label: 'Regions & Locations' },
   { to: '/transporters', icon: TrainFront, label: 'Transporters' },
   { to: '/trucks', icon: Truck, label: 'Trucks' },

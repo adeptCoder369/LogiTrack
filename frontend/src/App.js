@@ -42,6 +42,8 @@ import Tenants from "./pages/Tenants";
 import RegionsAndLocations from "./pages/RegionsAndLocations";
 import Leads from "./pages/Leads";
 import Firms from "./pages/Firms";
+import Employees from "./pages/Employees";
+import DepartmentsDesignations from "./pages/DepartmentsDesignations";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -284,6 +286,18 @@ function AppRoutes() {
       <Route path="/firms" element={
         <ProtectedRoute permission="Firms (View)">
           <AppLayout><Firms /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/employees" element={
+        <ProtectedRoute permission="Employees (View)">
+          <AppLayout><Employees /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/departments-designations" element={
+        <ProtectedRoute permission="Departments (View)">
+          <AppLayout><DepartmentsDesignations /></AppLayout>
         </ProtectedRoute>
       } />
 

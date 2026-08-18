@@ -123,6 +123,9 @@ class DbCompat:
         'firm_factories': sql_models.FirmFactory,
         'firm_access': sql_models.FirmAccess,
         'client_modules': sql_models.ClientModule,
+        'departments': sql_models.Department,
+        'designations': sql_models.Designation,
+        'employees': sql_models.Employee,
     }
 
     def __getattr__(self, name):

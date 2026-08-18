@@ -406,6 +406,31 @@ export const firmsApi = {
   revokeAccess: (firmId, grantId) => api.delete(`/firms/${firmId}/access/${grantId}`),
 };
 
+// Employees (Phase 3)
+export const employeesApi = {
+  getAll: (params) => api.get('/employees', { params }),
+  getOne: (id) => api.get(`/employees/${id}`),
+  create: (data) => api.post('/employees', data),
+  update: (id, data) => api.put(`/employees/${id}`, data),
+  delete: (id) => api.delete(`/employees/${id}`),
+  enableLogin: (id, data) => api.post(`/employees/${id}/enable-login`, data),
+  unlink: (id) => api.post(`/employees/${id}/unlink`),
+};
+
+export const departmentsApi = {
+  getAll: () => api.get('/departments'),
+  create: (data) => api.post('/departments', data),
+  update: (id, data) => api.put(`/departments/${id}`, data),
+  delete: (id) => api.delete(`/departments/${id}`),
+};
+
+export const designationsApi = {
+  getAll: () => api.get('/designations'),
+  create: (data) => api.post('/designations', data),
+  update: (id, data) => api.put(`/designations/${id}`, data),
+  delete: (id) => api.delete(`/designations/${id}`),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),

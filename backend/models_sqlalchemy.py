@@ -35,6 +35,7 @@ class User(Base):
     otp_verified = Column(Boolean, default=False)
     password_set = Column(Boolean, default=True)
     is_master_admin = Column(Boolean, default=False)
+    employee_id = Column(VARCHAR(36))
     assigned_products = Column(JSON)
     assigned_depots = Column(JSON)
     excluded_products = Column(JSON)
@@ -852,4 +853,58 @@ class ClientModule(Base):
         Index('uk_company_module', 'tenant_id', 'company_id', 'module', unique=True),
         Index('idx_tenant', 'tenant_id'),
         Index('idx_company', 'company_id'),
+    )
+
+
+class Department(Base):
+    __tablename__ = 'departments'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
+    description = Column(Text)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+    )
+
+
+class Designation(Base):
+    __tablename__ = 'designations'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
+    department_id = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_department', 'department_id'),
+    )
+
+
+class Employee(Base):
+    __tablename__ = 'employees'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    employee_type = Column(VARCHAR(20), nullable=False, default='Internal')
+    employee_id = Column(VARCHAR(100))
+    name = Column(VARCHAR(255), nullable=False)
+    mobile = Column(VARCHAR(50))
+    email = Column(VARCHAR(255))
+    company_id = Column(VARCHAR(36))
+    department_id = Column(VARCHAR(36))
+    designation_id = Column(VARCHAR(36))
+    leads_scope = Column(VARCHAR(20), default='All')
+    login_enabled = Column(Boolean, default=False)
+    user_id = Column(VARCHAR(36))
+    address = Column(Text)
+    city = Column(VARCHAR(100))
+    state = Column(VARCHAR(100))
+    joined_at = Column(VARCHAR(50))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_company', 'company_id'),
+        Index('idx_department', 'department_id'),
+        Index('idx_designation', 'designation_id'),
+        Index('idx_user', 'user_id'),
     )
