@@ -195,9 +195,10 @@ def _lead_db():
         leads=FakeCollection([{
             "id": "L1", "lead_type": "Sales", "company_name": "Acme Traders",
             "status": "Qualified", "parent_client_id": "C0",
-            "assigned_employee_id": "U1", "converted_company_id": None,
+            "assigned_employee_id": "E1", "converted_company_id": None,
         }]),
         companies=FakeCollection([{"id": "C0", "name": "Parent", "is_client": True}]),
+        employees=FakeCollection([{"id": "E1", "name": "Ravi", "user_id": "U1"}]),
         users=FakeCollection([{"id": "U1", "name": "Ravi", "company_id": None}]),
     )
 
@@ -215,6 +216,7 @@ async def test_lead_convert_creates_client_and_links_employee(monkeypatch):
     assert created and created[0]["entity_roles"] == ["Client"]
     assert created[0]["parent_client_id"] == "C0"
 
+    # The employee's linked user (U1) was moved to the new company.
     user_updates = [c for c in fake_db.users.calls if c[0] == "update_one"]
     assert user_updates and user_updates[0][2]["$set"]["company_id"] == result["converted_company_id"]
 

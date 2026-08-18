@@ -63,6 +63,20 @@ async def get_leads(
         query["status"] = status
     if lead_type:
         query["lead_type"] = lead_type
+
+    # Employees see their scope's leads (Sales|Purchase) plus anything
+    # assigned to them; Management/master admin see everything.
+    is_management = current_user.get("role") == "Management" or current_user.get("is_master_admin")
+    if not is_management and current_user.get("employee_id"):
+        emp = await db.employees.find_one({"id": current_user["employee_id"]})
+        scope = (emp or {}).get("leads_scope") or "All"
+        branches = [{"assigned_employee_id": current_user["employee_id"]}]
+        if current_user.get("id"):
+            branches.append({"assigned_employee_id": current_user["id"]})  # legacy user-id assignments
+        if scope != "All":
+            branches.append({"lead_type": scope})
+        query["$or"] = branches
+
     return await db.leads.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
 
@@ -172,10 +186,18 @@ async def convert_lead(lead_id: str, current_user: dict = Depends(get_current_us
     # new client company (the user then manages/executes for this client).
     assigned_employee_id = lead.get("assigned_employee_id")
     if assigned_employee_id:
-        await db.users.update_one(
-            {"id": assigned_employee_id},
-            {"$set": {"company_id": company_id}},
-        )
+        emp = await db.employees.find_one({"id": assigned_employee_id})
+        if emp and emp.get("user_id"):
+            await db.users.update_one(
+                {"id": emp["user_id"]},
+                {"$set": {"company_id": company_id}},
+            )
+        else:
+            # Legacy assignments stored a user id directly.
+            await db.users.update_one(
+                {"id": assigned_employee_id},
+                {"$set": {"company_id": company_id}},
+            )
 
     now = datetime.now(timezone.utc).isoformat()
     await db.leads.update_one(

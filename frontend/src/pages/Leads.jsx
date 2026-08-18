@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { leadsApi, usersApi, companiesApi } from '../lib/api';
+import { leadsApi, companiesApi, employeesApi } from '../lib/api';
 
 const STATUS_STYLES = {
   'New': 'bg-blue-50 text-blue-700 border-blue-100',
@@ -39,7 +39,7 @@ const emptyForm = {
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,11 +68,11 @@ export default function Leads() {
   useEffect(() => {
     (async () => {
       try {
-        const [usersRes, companiesRes] = await Promise.all([
-          usersApi.getAll(),
+        const [employeesRes, companiesRes] = await Promise.all([
+          employeesApi.getAll({ employee_type: 'Internal' }),
           companiesApi.getAll()
         ]);
-        setUsers(usersRes.data || []);
+        setEmployees(employeesRes.data || []);
         setCompanies(companiesRes.data || []);
       } catch {
         // non-fatal
@@ -88,7 +88,7 @@ export default function Leads() {
     }
     setSaving(true);
     try {
-      const employee = users.find((u) => u.id === formData.assigned_employee_id);
+      const employee = employees.find((e) => e.id === formData.assigned_employee_id);
       const payload = {
         ...formData,
         assigned_employee_name: employee?.name || formData.assigned_employee_name,
@@ -435,21 +435,21 @@ export default function Leads() {
                   <select
                     value={formData.assigned_employee_id}
                     onChange={(e) => {
-                      const u = users.find((x) => x.id === e.target.value);
+                      const emp = employees.find((x) => x.id === e.target.value);
                       setFormData({
                         ...formData,
                         assigned_employee_id: e.target.value,
-                        assigned_employee_name: u?.name || '',
+                        assigned_employee_name: emp?.name || '',
                       });
                     }}
                     className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                   >
                     <option value="">— Unassigned —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}{emp.designation_id ? '' : ''}</option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-slate-400 mt-1">On conversion, this employee's user record is linked to the new client company.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">On conversion, this employee's login user is linked to the new client company.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
