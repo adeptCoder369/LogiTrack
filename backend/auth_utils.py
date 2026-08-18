@@ -254,6 +254,14 @@ async def get_user_product_ids(user: dict) -> Optional[List[str]]:
             role_products = {row[0] for row in result.all()}
 
     effective_products = assigned_products.union(role_products.difference(excluded_products))
+
+    # Firm-grant enforcement (Phase 3): an employee with firm_access grants
+    # only ever sees granted products (strict global intersection).
+    firm_pairs = await get_user_firm_granted_pairs(user)
+    if firm_pairs:
+        granted = {p["product_id"] for p in firm_pairs}
+        effective_products &= granted
+
     return list(effective_products)
 
 async def get_user_depot_ids(user: dict) -> Optional[List[str]]:
@@ -276,6 +284,14 @@ async def get_user_depot_ids(user: dict) -> Optional[List[str]]:
             role_depots = {row[0] for row in result.all()}
 
     effective_depots = assigned_depots.union(role_depots.difference(excluded_depots))
+
+    # Firm-grant enforcement (Phase 3): an employee with firm_access grants
+    # only ever sees granted depots (strict global intersection).
+    firm_pairs = await get_user_firm_granted_pairs(user)
+    if firm_pairs:
+        granted = {p["depot_id"] for p in firm_pairs}
+        effective_depots &= granted
+
     return list(effective_depots)
 
 async def build_depot_filter(user: dict, depot_field: str = "depot_id") -> dict:
