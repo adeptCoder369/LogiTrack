@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
-import { usersApi, depotsApi, adminApi, productsApi, productAccessApi, depotAccessApi, exportApi, transportersApi } from '../lib/api';
+import { usersApi, depotsApi, adminApi, productsApi, productAccessApi, depotAccessApi, exportApi, transportersApi, employeesApi } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { usePermissions } from '../lib/permissions';
 import { Can } from '../components/Can';
@@ -61,6 +61,7 @@ export default function UserManagement() {
   const [depots, setDepots] = useState([]);
   const [products, setProducts] = useState([]);
   const [transporters, setTransporters] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,6 +74,7 @@ export default function UserManagement() {
     email: '',
     depot_id: '',
     transporter_id: '',
+    employee_id: '',
     assigned_products: [],
     assigned_depots: [],
   });
@@ -83,16 +85,18 @@ export default function UserManagement() {
 
   const fetchData = async () => {
     try {
-      const [usersRes, depotsRes, productsRes, transportersRes] = await Promise.all([
+      const [usersRes, depotsRes, productsRes, transportersRes, employeesRes] = await Promise.all([
         usersApi.getAll(),
         depotsApi.getAll(),
         productsApi.getAll(),
-        transportersApi.getAll()
+        transportersApi.getAll(),
+        employeesApi.getAll({ employee_type: 'Internal' })
       ]);
       setUsers(usersRes.data);
       setDepots(depotsRes.data);
       setProducts(productsRes.data);
       setTransporters(transportersRes.data);
+      setEmployees(employeesRes.data || []);
     } catch (error) {
       toast.error('Failed to load users');
     } finally {
@@ -110,6 +114,7 @@ export default function UserManagement() {
       email: '',
       depot_id: '',
       transporter_id: '',
+      employee_id: '',
       assigned_products: [],
       assigned_depots: [],
     });
@@ -132,6 +137,7 @@ export default function UserManagement() {
       email: user.email || '',
       depot_id: user.depot_id || '',
       transporter_id: user.transporter_id || '',
+      employee_id: user.employee_id || '',
       assigned_products: user.assigned_products || [],
       assigned_depots: user.assigned_depots || [],
     });
@@ -196,6 +202,7 @@ export default function UserManagement() {
           email: formData.email || null,
           depot_id: formData.depot_id || null,
           transporter_id: formData.role === 'Transporter' ? (formData.transporter_id || null) : null,
+          employee_id: formData.employee_id || null,
           company_id: formData.company_id || null,
           assigned_products: formData.assigned_products,
           assigned_depots: formData.assigned_depots,
@@ -368,6 +375,11 @@ export default function UserManagement() {
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{user.name}</p>
+                            {user.employee_id && (
+                              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-semibold">
+                                Employee
+                              </span>
+                            )}
                             {user.transporter_id && (
                               <span className="font-bold text-blue-600">
                                ( {user.transporter_name || transporters.find(t => t.id === user.transporter_id)?.name} )
@@ -562,6 +574,35 @@ export default function UserManagement() {
                 placeholder="email@example.com"
               />
             </div>
+
+            {!editingUser && (
+              <div>
+                <Label>Link Employee (Optional)</Label>
+                <Select
+                  value={formData.employee_id}
+                  onValueChange={(value) => {
+                    const emp = employees.find((e) => e.id === value);
+                    setFormData({
+                      ...formData,
+                      employee_id: value,
+                      name: emp?.name || formData.name,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Link an internal employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees
+                      .filter((e) => !e.user_id)
+                      .map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">Links this login to an employee without one (syncs employee_id both ways).</p>
+              </div>
+            )}
 
             {/* Depot Access */}
             <div data-testid="depot-access-section">

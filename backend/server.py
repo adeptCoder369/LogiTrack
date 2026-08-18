@@ -179,6 +179,7 @@ class AdminCreateUserRequest(BaseModel):
     company_id: Optional[str] = None
     email: Optional[str] = None
     depot_id: Optional[str] = None
+    employee_id: Optional[str] = None
     assigned_products: List[str] = []
     assigned_depots: List[str] = []
 
@@ -615,6 +616,7 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
     user_doc = sql_models.User(
         id=user_id,
         tenant_id=tenant_id_for_current_user(current_user),
+        employee_id=data.employee_id,
         name=data.name,
         mobile=full_mobile,
         country_code=data.country_code,
@@ -655,6 +657,17 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
     async with AsyncSessionLocal() as session:
         session.add(user_doc)
         await session.commit()
+
+    # Sync the reverse linkage on the employee record (Phase 3).
+    if data.employee_id:
+        async with AsyncSessionLocal() as session:
+            emp = (await session.execute(
+                select(sql_models.Employee).where(sql_models.Employee.id == data.employee_id)
+            )).scalar_one_or_none()
+            if emp:
+                emp.user_id = user_id
+                emp.login_enabled = True
+                await session.commit()
     user_response = {
         "id": user_doc.id,
         "name": user_doc.name,
