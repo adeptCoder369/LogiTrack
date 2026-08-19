@@ -6,13 +6,15 @@ company_pricing (0 when absent - editable inline), GST is invoice-level.
 Status flow: Draft -> Issued -> Partially Paid -> Paid (Overdue derived).
 """
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 import uuid
+import io
 
 from .db_compat import db
-from auth_utils import get_current_user, check_permission
+from auth_utils import get_current_user, get_download_user, check_permission
 
 router = APIRouter(tags=["Invoices"])
 
@@ -275,3 +277,136 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_curre
     await db.invoice_items.delete_many({"invoice_id": invoice_id})
     await db.invoices.delete_one({"id": invoice_id})
     return {"message": "Invoice deleted"}
+
+
+# ============ EXPORT (PDF / EXCEL) ============
+
+@router.get("/invoices/{invoice_id}/export")
+async def export_invoice(invoice_id: str, format: str = "pdf", current_user: dict = Depends(get_download_user)):
+    """Invoice as a reportlab PDF or openpyxl Excel workbook."""
+    inv = await _invoice_or_404(invoice_id)
+    items = await _invoice_items(invoice_id)
+    paid = await _paid_total(invoice_id)
+    credits = await _credit_total(invoice_id)
+    outstanding = round((inv.get("total_amount") or 0) - paid - credits, 2)
+
+    def _rows():
+        return [
+            [i.get("product_name") or "", i.get("description") or "", i.get("quantity_mt") or 0, i.get("rate") or 0, i.get("amount") or 0]
+            for i in items
+        ]
+
+    if format == "pdf":
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+        doc = SimpleDocTemplate(io.BytesIO(), pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+
+        story.append(Paragraph(f"Invoice {inv.get('invoice_no')}", styles['Title']))
+        story.append(Spacer(1, 6))
+        info = [
+            f"Client: {inv.get('client_company_name') or ''}",
+            f"Billing: {inv.get('billing_company_name') or ''}",
+            f"Source: {inv.get('source_name') or ''}",
+            f"PO: {inv.get('po_number') or ''}",
+            f"Date: {inv.get('invoice_date') or ''}   Due: {inv.get('due_date') or ''}",
+            f"Status: {inv.get('status') or ''}   Outstanding: {outstanding}",
+        ]
+        for line in info:
+            story.append(Paragraph(line, styles['Normal']))
+        story.append(Spacer(1, 10))
+
+        data = [["Product", "Description", "Qty (MT)", "Rate", "Amount"]] + _rows()
+        table = Table(data, colWidths=[60 * mm, 60 * mm, 25 * mm, 25 * mm, 25 * mm])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E40AF')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 10))
+        totals = [
+            f"Subtotal: {inv.get('subtotal') or 0}",
+            f"GST ({inv.get('gst_rate') or 0}%): {inv.get('gst_amount') or 0}",
+            f"Total: {inv.get('total_amount') or 0}",
+            f"Paid: {paid}   Credits: {credits}   Outstanding: {outstanding}",
+        ]
+        for line in totals:
+            story.append(Paragraph(line, styles['Normal']))
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc.build(story)
+        buffer.seek(0)
+        filename = f"Invoice_{inv.get('invoice_no')}.pdf"
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    if format == "excel":
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Invoice"
+
+        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                             top=Side(style='thin'), bottom=Side(style='thin'))
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+
+        ws.cell(row=1, column=1, value=f"Invoice {inv.get('invoice_no')}").font = Font(bold=True, size=14)
+        meta = [
+            ("Client", inv.get("client_company_name") or ""),
+            ("Billing", inv.get("billing_company_name") or ""),
+            ("Source", inv.get("source_name") or ""),
+            ("PO", inv.get("po_number") or ""),
+            ("Date / Due", f"{inv.get('invoice_date') or ''} / {inv.get('due_date') or ''}"),
+            ("Status / Outstanding", f"{inv.get('status') or ''} / {outstanding}"),
+        ]
+        for idx, (label, value) in enumerate(meta, start=2):
+            ws.cell(row=idx, column=1, value=f"{label}: {value}")
+
+        headers = ["Product", "Description", "Qty (MT)", "Rate", "Amount"]
+        header_row = len(meta) + 3
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=header_row, column=col, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = thin_border
+
+        for row_idx, item in enumerate(_rows(), start=header_row + 1):
+            for col_idx, value in enumerate(item, 1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = thin_border
+
+        total_row = header_row + len(items) + 1
+        totals = [
+            f"Subtotal: {inv.get('subtotal') or 0}",
+            f"GST ({inv.get('gst_rate') or 0}%): {inv.get('gst_amount') or 0}",
+            f"Total: {inv.get('total_amount') or 0}",
+            f"Paid: {paid}   Credits: {credits}   Outstanding: {outstanding}",
+        ]
+        for idx, line in enumerate(totals, start=1):
+            ws.cell(row=total_row + idx - 1, column=1, value=line).font = Font(bold=True)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        filename = f"Invoice_{inv.get('invoice_no')}.xlsx"
+        return StreamingResponse(
+            buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    raise HTTPException(status_code=400, detail="Unsupported format")
