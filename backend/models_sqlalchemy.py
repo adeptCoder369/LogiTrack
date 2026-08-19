@@ -1131,3 +1131,35 @@ class UsageLog(Base):
         Index('idx_tenant', 'tenant_id'),
         Index('idx_created', 'created_at'),
     )
+
+
+class Subscription(Base):
+    __tablename__ = 'subscriptions'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    plan = Column(VARCHAR(100), nullable=False)
+    status = Column(VARCHAR(50), nullable=False, default='active')
+    provider = Column(VARCHAR(50))
+    provider_subscription_id = Column(VARCHAR(255))
+    current_period_start = Column(DateTime)
+    current_period_end = Column(DateTime)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('uk_tenant', 'tenant_id', unique=True),
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_status', 'status'),
+    )
+
+
+class BillingEvent(Base):
+    __tablename__ = 'billing_events'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36))
+    provider = Column(VARCHAR(50), nullable=False)
+    event_type = Column(VARCHAR(100), nullable=False)
+    payload = Column(Text)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_provider', 'provider'),
+    )

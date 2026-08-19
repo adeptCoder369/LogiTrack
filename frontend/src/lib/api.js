@@ -553,6 +553,16 @@ export const usageApi = {
   quotaCheck: (key) => api.get('/usage/quota-check', { params: { key } }),
 };
 
+// Billing (Phase 6)
+export const billingApi = {
+  listSubscriptions: () => api.get('/billing/subscriptions'),
+  getSubscription: (tenantId) => api.get(`/billing/subscriptions/${tenantId}`),
+  upsertSubscription: (data) => api.post('/billing/subscriptions', data),
+  createCheckout: (tenantId, plan, provider) => api.post(`/billing/checkout/${tenantId}`, null, { params: { plan, provider } }),
+  createPortal: (tenantId, provider) => api.post(`/billing/portal/${tenantId}`, null, { params: { provider } }),
+  webhook: (provider, payload) => api.post(`/billing/webhook/${provider}`, payload),
+};
+
 // File Upload
 export const uploadFile = async (file) => {
   const formData = new FormData();

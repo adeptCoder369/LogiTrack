@@ -49,6 +49,7 @@ import Payments from "./pages/Payments";
 import Notes from "./pages/Notes";
 import StockTransfers from "./pages/StockTransfers";
 import UsageDashboard from "./pages/UsageDashboard";
+import Billing from "./pages/Billing";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -333,6 +334,12 @@ function AppRoutes() {
       <Route path="/usage" element={
         <ProtectedRoute permission="Usage (View)">
           <AppLayout><UsageDashboard /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/billing" element={
+        <ProtectedRoute masterOnly>
+          <AppLayout><Billing /></AppLayout>
         </ProtectedRoute>
       } />
 

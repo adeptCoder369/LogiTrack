@@ -33,7 +33,8 @@ import {
   Map,
   Target,
   Network,
-  ArrowRightLeft
+  ArrowRightLeft,
+  CreditCard
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -63,6 +64,7 @@ const allNavItems = [
   { to: '/notes', icon: FileBarChart, label: 'Credit / Debit Notes' },
   { to: '/stock-transfers', icon: ArrowRightLeft, label: 'Stock Transfers' },
   { to: '/usage', icon: BarChart3, label: 'Usage Dashboard' },
+  { to: '/billing', icon: CreditCard, label: 'Billing' },
   { to: '/regions-locations', icon: Map, label: 'Regions & Locations' },
   { to: '/transporters', icon: TrainFront, label: 'Transporters' },
   { to: '/trucks', icon: Truck, label: 'Trucks' },
