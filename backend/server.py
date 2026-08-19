@@ -1769,6 +1769,7 @@ from routes import (
     invoicing_router, payments_router, notes_router, stock_transfers_router, usage_router, billing_router
 )
 from routes.extensions import router as extensions_router
+from routes.v2 import router as v2_router
 
 api_router.include_router(reports_router)
 api_router.include_router(companies_router)
@@ -1802,14 +1803,17 @@ api_router.include_router(stock_transfers_router)
 api_router.include_router(usage_router)
 api_router.include_router(billing_router)
 api_router.include_router(extensions_router)
+app.include_router(v2_router)
 
 app.include_router(api_router)
 
 # Phase 6: usage tracking + tenant context (must run before CORS response handling)
 from middleware.usage import TenantContextMiddleware, UsageMiddleware
+from middleware.deprecation import DeprecationMiddleware
 
 app.add_middleware(UsageMiddleware)
 app.add_middleware(TenantContextMiddleware)
+app.add_middleware(DeprecationMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
