@@ -27,6 +27,7 @@ from .employees import router as employees_router
 from .invoicing import router as invoicing_router
 from .payments import router as payments_router
 from .notes import router as notes_router
+from .stock_transfers import router as stock_transfers_router
 
 __all__ = [
     'reports_router', 'companies_router', 'transporters_router',
@@ -37,5 +38,5 @@ __all__ = [
     'verified_trucks_router', 'company_inventory_router', 'tenants_router',
     'source_access_router', 'sources_router', 'product_management_router',
     'locations_router', 'leads_router', 'firms_router', 'employees_router',
-    'invoicing_router', 'payments_router', 'notes_router',
+    'invoicing_router', 'payments_router', 'notes_router', 'stock_transfers_router',
 ]

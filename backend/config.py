@@ -261,4 +261,11 @@ PERMISSION_DEFAULTS = {
     "Debit Notes (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Debit Notes (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Debit Notes (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+
+    # Stock Transfers (Phase 5)
+    "Stock Transfers (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": True, "Depot Staff": True, "Depot Supervisor": True},
+    "Stock Transfers (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": True, "Depot Staff": True, "Depot Supervisor": True},
+    "Stock Transfers (Approve)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Stock Transfers (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": True, "Depot Staff": False, "Depot Supervisor": True},
+    "Stock Transfers (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Depot Staff": False, "Depot Supervisor": False},
 }

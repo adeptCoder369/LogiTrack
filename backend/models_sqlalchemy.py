@@ -1037,3 +1037,60 @@ class DebitNote(Base):
         Index('idx_invoice', 'invoice_id'),
         Index('idx_company', 'company_id'),
     )
+
+
+class StockTransfer(Base):
+    __tablename__ = 'stock_transfers'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    transfer_no = Column(VARCHAR(100), nullable=False)
+    product_id = Column(VARCHAR(36), nullable=False)
+    product_name = Column(VARCHAR(255))
+    quantity_mt = Column(Float, nullable=False, default=0)
+    from_type = Column(VARCHAR(20), nullable=False)
+    from_id = Column(VARCHAR(36), nullable=False)
+    from_name = Column(VARCHAR(255))
+    to_type = Column(VARCHAR(20), nullable=False)
+    to_id = Column(VARCHAR(36), nullable=False)
+    to_name = Column(VARCHAR(255))
+    status = Column(VARCHAR(50), nullable=False, default='Requested')
+    requested_by = Column(VARCHAR(36))
+    requested_by_name = Column(VARCHAR(255))
+    approved_by = Column(VARCHAR(36))
+    approved_by_name = Column(VARCHAR(255))
+    dispatched_by = Column(VARCHAR(36))
+    dispatched_by_name = Column(VARCHAR(255))
+    received_by = Column(VARCHAR(36))
+    received_by_name = Column(VARCHAR(255))
+    request_notes = Column(Text)
+    approval_notes = Column(Text)
+    dispatch_notes = Column(Text)
+    receive_notes = Column(Text)
+    requested_at = Column(DateTime)
+    approved_at = Column(DateTime)
+    dispatched_at = Column(DateTime)
+    received_at = Column(DateTime)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_status', 'status'),
+        Index('idx_from', 'from_type', 'from_id'),
+        Index('idx_to', 'to_type', 'to_id'),
+        Index('idx_product', 'product_id'),
+    )
+
+
+class StockTransferAudit(Base):
+    __tablename__ = 'stock_transfer_audit'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    transfer_id = Column(VARCHAR(36), nullable=False)
+    event = Column(VARCHAR(50), nullable=False)
+    actor_id = Column(VARCHAR(36))
+    actor_name = Column(VARCHAR(255))
+    payload = Column(Text)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_transfer', 'transfer_id'),
+    )

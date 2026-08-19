@@ -132,6 +132,8 @@ class DbCompat:
         'invoice_payments': sql_models.InvoicePayment,
         'credit_notes': sql_models.CreditNote,
         'debit_notes': sql_models.DebitNote,
+        'stock_transfers': sql_models.StockTransfer,
+        'stock_transfer_audit': sql_models.StockTransferAudit,
     }
 
     def __getattr__(self, name):
