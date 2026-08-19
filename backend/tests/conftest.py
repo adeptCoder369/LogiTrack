@@ -163,17 +163,27 @@ class FakeCollection:
         for row in matched:
             for k, v in (update_dict or {}).get("$set", {}).items():
                 row[k] = v
+            for k, v in (update_dict or {}).get("$inc", {}).items():
+                row[k] = float(row.get(k, 0) or 0) + float(v)
         self.rowcount = 1 if matched else 0
         return SimpleNamespace(matched_count=len(matched), modified_count=len(matched))
 
     async def delete_one(self, filter_dict):
         self.calls.append(("delete_one", filter_dict))
-        self.rowcount = 1
-        return SimpleNamespace(deleted_count=1)
+        matched = self._filter(filter_dict or {})
+        if matched:
+            self.rows.remove(matched[0])
+            self.rowcount = 1
+            return SimpleNamespace(deleted_count=1)
+        self.rowcount = 0
+        return SimpleNamespace(deleted_count=0)
 
     async def delete_many(self, filter_dict):
         self.calls.append(("delete_many", filter_dict))
-        return SimpleNamespace(deleted_count=len(self._filter(filter_dict or {})))
+        matched = self._filter(filter_dict or {})
+        for r in list(matched):
+            self.rows.remove(r)
+        return SimpleNamespace(deleted_count=len(matched))
 
 
 class FakeDb:
