@@ -962,3 +962,38 @@ class InvoiceItem(Base):
         Index('idx_invoice', 'invoice_id'),
         Index('idx_product', 'product_id'),
     )
+
+
+class Payment(Base):
+    __tablename__ = 'payments'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    receipt_no = Column(VARCHAR(100), nullable=False)
+    company_id = Column(VARCHAR(36), nullable=False)
+    company_name = Column(VARCHAR(255))
+    amount = Column(Float, nullable=False, default=0)
+    mode = Column(VARCHAR(50), default='Bank Transfer')
+    bank_ref = Column(VARCHAR(255))
+    payment_date = Column(VARCHAR(50))
+    notes = Column(Text)
+    created_by = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_company', 'company_id'),
+    )
+
+
+class InvoicePayment(Base):
+    __tablename__ = 'invoice_payments'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    invoice_id = Column(VARCHAR(36), nullable=False)
+    payment_id = Column(VARCHAR(36), nullable=False)
+    amount_allocated = Column(Float, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_invoice', 'invoice_id'),
+        Index('idx_payment', 'payment_id'),
+    )

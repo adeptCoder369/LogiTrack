@@ -128,6 +128,8 @@ class DbCompat:
         'employees': sql_models.Employee,
         'invoices': sql_models.Invoice,
         'invoice_items': sql_models.InvoiceItem,
+        'payments': sql_models.Payment,
+        'invoice_payments': sql_models.InvoicePayment,
     }
 
     def __getattr__(self, name):
