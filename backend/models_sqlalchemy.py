@@ -272,6 +272,7 @@ class DepotInventory(Base):
     total_received = Column(Float, default=0)
     total_dispatched = Column(Float, default=0)
     available_quantity = Column(Float, default=0)
+    locked_qty = Column(Float, default=0)
     last_updated = Column(DateTime)
     __table_args__ = (
         Index('uk_depot_product', 'tenant_id', 'depot_id', 'product_id', unique=True),
@@ -292,6 +293,7 @@ class CompanyInventory(Base):
     total_received = Column(Float, default=0)
     total_dispatched = Column(Float, default=0)
     available_quantity = Column(Float, default=0)
+    locked_qty = Column(Float, default=0)
     last_updated = Column(DateTime)
     __table_args__ = (
         Index('uk_company_product', 'tenant_id', 'company_id', 'product_id', unique=True),

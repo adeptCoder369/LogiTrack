@@ -107,6 +107,101 @@ async def _audit(transfer_id: str, event: str, actor: dict, payload: dict = None
     })
 
 
+async def _inventory_for(party_type: str, party_id: str, product_id: str):
+    if party_type == "Depot":
+        return await db.depot_inventory.find_one({"depot_id": party_id, "product_id": product_id})
+    return await db.company_inventory.find_one({"company_id": party_id, "product_id": product_id})
+
+
+async def _adjust_locked(party_type: str, party_id: str, product_id: str, delta: float):
+    coll = db.depot_inventory if party_type == "Depot" else db.company_inventory
+    key = {"depot_id": party_id, "product_id": product_id} if party_type == "Depot" else {"company_id": party_id, "product_id": product_id}
+    await coll.update_one(key, {"$inc": {"locked_qty": delta}})
+
+
+async def _lock_source(transfer: dict):
+    inv = await _inventory_for(transfer["from_type"], transfer["from_id"], transfer["product_id"])
+    available = float(inv.get("available_quantity", 0)) if inv else 0
+    locked = float(inv.get("locked_qty", 0)) if inv else 0
+    qty = float(transfer["quantity_mt"])
+    if available - locked < qty - 1e-9:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient stock at source (available {available - locked:.2f} MT, requested {qty:.2f} MT)",
+        )
+    await _adjust_locked(transfer["from_type"], transfer["from_id"], transfer["product_id"], qty)
+
+
+async def _unlock_source(transfer: dict):
+    await _adjust_locked(transfer["from_type"], transfer["from_id"], transfer["product_id"], -float(transfer["quantity_mt"]))
+
+
+async def _move_inventory(transfer: dict):
+    # Decrement source (available), increment destination. Uses the atomic
+    # helpers from liftings.py so the pattern stays consistent.
+    from routes.liftings import update_depot_inventory, update_company_inventory
+
+    product = await db.products.find_one({"id": transfer["product_id"]})
+    product_code = product.get("product_code") if product else ""
+    product_name = transfer.get("product_name") or (product.get("product_name") if product else "")
+    qty = float(transfer["quantity_mt"])
+
+    # Source decrement
+    if transfer["from_type"] == "Depot":
+        # Company id for depot inventory seed: try to keep the existing one.
+        inv = await _inventory_for("Depot", transfer["from_id"], transfer["product_id"])
+        company_id = inv.get("company_id") if inv else None
+        await update_depot_inventory(
+            depot_id=transfer["from_id"],
+            depot_name=transfer["from_name"],
+            product_id=transfer["product_id"],
+            product_name=product_name,
+            product_code=product_code,
+            quantity_change=qty,
+            is_incoming=False,
+            company_id=company_id or "",
+        )
+    else:
+        await update_company_inventory(
+            company_id=transfer["from_id"],
+            company_name=transfer["from_name"],
+            product_id=transfer["product_id"],
+            product_name=product_name,
+            product_code=product_code,
+            quantity_change=qty,
+            is_incoming=False,
+        )
+
+    # Destination increment
+    if transfer["to_type"] == "Depot":
+        inv = await _inventory_for("Depot", transfer["to_id"], transfer["product_id"])
+        company_id = inv.get("company_id") if inv else None
+        # Fallback: depot's company
+        if not company_id:
+            depot = await db.depots.find_one({"id": transfer["to_id"]})
+            company_id = depot.get("company_id") if depot else ""
+        await update_depot_inventory(
+            depot_id=transfer["to_id"],
+            depot_name=transfer["to_name"],
+            product_id=transfer["product_id"],
+            product_name=product_name,
+            product_code=product_code,
+            quantity_change=qty,
+            is_incoming=True,
+            company_id=company_id or "",
+        )
+    else:
+        await update_company_inventory(
+            company_id=transfer["to_id"],
+            company_name=transfer["to_name"],
+            product_id=transfer["product_id"],
+            product_name=product_name,
+            product_code=product_code,
+            quantity_change=qty,
+            is_incoming=True,
+        )
+
+
 def _transfer_or_404(transfer: dict | None):
     if not transfer:
         raise HTTPException(status_code=404, detail="Stock transfer not found")
@@ -155,6 +250,14 @@ async def create_stock_transfer(data: StockTransferCreate, current_user: dict = 
     }
     await db.stock_transfers.insert_one(transfer)
     await _audit(transfer_id, "Requested", current_user, {"quantity_mt": data.quantity_mt})
+
+    # Reserve stock at the source so it cannot be consumed elsewhere.
+    try:
+        await _lock_source(transfer)
+    except HTTPException:
+        await db.stock_transfers.delete_one({"id": transfer_id})
+        await db.stock_transfer_audit.delete_many({"transfer_id": transfer_id})
+        raise
 
     return transfer
 
@@ -251,7 +354,13 @@ async def dispatch_transfer(transfer_id: str, payload: TransitionPayload = None,
 async def receive_transfer(transfer_id: str, payload: TransitionPayload = None, current_user: dict = Depends(get_current_user)):
     await check_permission(current_user, "Stock Transfers (Update)")
     notes = payload.notes if payload else None
-    return await _transition(transfer_id, "Received", "Received", current_user, notes=notes)
+    transfer = await db.stock_transfers.find_one({"id": transfer_id})
+    _transfer_or_404(transfer)
+    result = await _transition(transfer_id, "Received", "Received", current_user, notes=notes)
+    # Release the reservation and move the stock atomically.
+    await _unlock_source(transfer)
+    await _move_inventory(transfer)
+    return result
 
 
 @router.post("/stock-transfers/{transfer_id}/reject")
@@ -264,7 +373,9 @@ async def reject_transfer(transfer_id: str, payload: TransitionPayload = None, c
     notes = payload.notes if payload else None
     if not notes:
         raise HTTPException(status_code=400, detail="Rejection reason is required")
-    return await _transition(transfer_id, "Rejected", "Rejected", current_user, notes=notes)
+    result = await _transition(transfer_id, "Rejected", "Rejected", current_user, notes=notes)
+    await _unlock_source(transfer)
+    return result
 
 
 @router.post("/stock-transfers/{transfer_id}/cancel")
@@ -275,7 +386,9 @@ async def cancel_transfer(transfer_id: str, payload: TransitionPayload = None, c
     _transfer_or_404(transfer)
     if transfer.get("requested_by") != current_user.get("id") and not current_user.get("is_master_admin") and current_user.get("role") != "Management":
         raise HTTPException(status_code=403, detail="Only the requester or Management can cancel")
-    return await _transition(transfer_id, "Cancelled", "Cancelled", current_user, notes=notes)
+    result = await _transition(transfer_id, "Cancelled", "Cancelled", current_user, notes=notes)
+    await _unlock_source(transfer)
+    return result
 
 
 @router.get("/stock-transfers/{transfer_id}/audit")
