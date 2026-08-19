@@ -243,4 +243,22 @@ PERMISSION_DEFAULTS = {
     "Designations (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Designations (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
     "Designations (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+
+    # Invoicing (Phase 4)
+    "Invoices (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Invoices (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Invoices (Generate)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Invoices (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Invoices (Issue)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Invoices (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Payments (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Payments (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Payments (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Payments (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Credit Notes (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Credit Notes (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Credit Notes (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Debit Notes (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Debit Notes (Create)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
+    "Debit Notes (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Transporter": False, "Depot Staff": False, "Depot Supervisor": False},
 }

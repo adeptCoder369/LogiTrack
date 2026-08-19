@@ -126,6 +126,8 @@ class DbCompat:
         'departments': sql_models.Department,
         'designations': sql_models.Designation,
         'employees': sql_models.Employee,
+        'invoices': sql_models.Invoice,
+        'invoice_items': sql_models.InvoiceItem,
     }
 
     def __getattr__(self, name):

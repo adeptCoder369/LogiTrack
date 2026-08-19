@@ -908,3 +908,57 @@ class Employee(Base):
         Index('idx_designation', 'designation_id'),
         Index('idx_user', 'user_id'),
     )
+
+
+class Invoice(Base):
+    __tablename__ = 'invoices'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    invoice_no = Column(VARCHAR(100), nullable=False)
+    po_id = Column(VARCHAR(36))
+    po_number = Column(VARCHAR(100))
+    client_company_id = Column(VARCHAR(36))
+    client_company_name = Column(VARCHAR(255))
+    billing_company_id = Column(VARCHAR(36))
+    billing_company_name = Column(VARCHAR(255))
+    source_type = Column(VARCHAR(20))
+    source_id = Column(VARCHAR(36))
+    source_name = Column(VARCHAR(255))
+    status = Column(VARCHAR(50), nullable=False, default='Draft')
+    invoice_date = Column(VARCHAR(50))
+    due_date = Column(VARCHAR(50))
+    subtotal = Column(Float, default=0)
+    gst_rate = Column(Float, default=0)
+    gst_amount = Column(Float, default=0)
+    total_amount = Column(Float, default=0)
+    currency = Column(VARCHAR(10), default='INR')
+    notes = Column(Text)
+    created_by = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_status', 'status'),
+        Index('idx_client', 'client_company_id'),
+        Index('idx_billing', 'billing_company_id'),
+        Index('idx_po', 'po_id'),
+    )
+
+
+class InvoiceItem(Base):
+    __tablename__ = 'invoice_items'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    invoice_id = Column(VARCHAR(36), nullable=False)
+    product_id = Column(VARCHAR(36))
+    product_name = Column(VARCHAR(255))
+    description = Column(Text)
+    quantity_mt = Column(Float, default=0)
+    rate = Column(Float, default=0)
+    amount = Column(Float, default=0)
+    tier = Column(VARCHAR(100))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_invoice', 'invoice_id'),
+        Index('idx_product', 'product_id'),
+    )
