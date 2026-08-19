@@ -1810,9 +1810,11 @@ app.include_router(api_router)
 # Phase 6: usage tracking + tenant context (must run before CORS response handling)
 from middleware.usage import TenantContextMiddleware, UsageMiddleware
 from middleware.deprecation import DeprecationMiddleware
+from middleware.tenant_resolver import TenantResolverMiddleware
 
 app.add_middleware(UsageMiddleware)
 app.add_middleware(TenantContextMiddleware)
+app.add_middleware(TenantResolverMiddleware)
 app.add_middleware(DeprecationMiddleware)
 
 app.add_middleware(
