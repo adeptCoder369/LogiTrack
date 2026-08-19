@@ -997,3 +997,43 @@ class InvoicePayment(Base):
         Index('idx_invoice', 'invoice_id'),
         Index('idx_payment', 'payment_id'),
     )
+
+
+class CreditNote(Base):
+    __tablename__ = 'credit_notes'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    note_no = Column(VARCHAR(100), nullable=False)
+    invoice_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36))
+    company_name = Column(VARCHAR(255))
+    amount = Column(Float, nullable=False, default=0)
+    reason = Column(Text)
+    applied = Column(Boolean, default=True)
+    created_by = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_invoice', 'invoice_id'),
+        Index('idx_company', 'company_id'),
+    )
+
+
+class DebitNote(Base):
+    __tablename__ = 'debit_notes'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    note_no = Column(VARCHAR(100), nullable=False)
+    invoice_id = Column(VARCHAR(36), nullable=False)
+    company_id = Column(VARCHAR(36))
+    company_name = Column(VARCHAR(255))
+    amount = Column(Float, nullable=False, default=0)
+    reason = Column(Text)
+    applied = Column(Boolean, default=True)
+    created_by = Column(VARCHAR(36))
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_invoice', 'invoice_id'),
+        Index('idx_company', 'company_id'),
+    )

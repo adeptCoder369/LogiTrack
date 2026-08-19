@@ -1765,7 +1765,7 @@ from routes import (
     verified_trucks_router, company_inventory_router, tenants_router,
     source_access_router, sources_router, product_management_router,
     locations_router, leads_router, firms_router, employees_router,
-    invoicing_router, payments_router
+    invoicing_router, payments_router, notes_router
 )
 
 api_router.include_router(reports_router)
@@ -1795,6 +1795,7 @@ api_router.include_router(firms_router)
 api_router.include_router(employees_router)
 api_router.include_router(invoicing_router)
 api_router.include_router(payments_router)
+api_router.include_router(notes_router)
 
 app.include_router(api_router)
 
