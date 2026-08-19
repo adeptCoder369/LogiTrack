@@ -135,6 +135,7 @@ class DbCompat:
         'stock_transfers': sql_models.StockTransfer,
         'stock_transfer_audit': sql_models.StockTransferAudit,
         'approval_matrices': sql_models.ApprovalMatrix,
+        'usage_logs': sql_models.UsageLog,
     }
 
     def __getattr__(self, name):

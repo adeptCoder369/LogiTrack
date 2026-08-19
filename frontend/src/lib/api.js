@@ -546,6 +546,13 @@ export const approvalMatricesApi = {
   delete: (id) => api.delete(`/approval-matrices/${id}`),
 };
 
+// Usage (Phase 6)
+export const usageApi = {
+  getSummary: (days) => api.get('/usage/summary', { params: { days } }),
+  getLogs: (params) => api.get('/usage/logs', { params }),
+  quotaCheck: (key) => api.get('/usage/quota-check', { params: { key } }),
+};
+
 // File Upload
 export const uploadFile = async (file) => {
   const formData = new FormData();

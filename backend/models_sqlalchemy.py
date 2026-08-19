@@ -1113,3 +1113,21 @@ class ApprovalMatrix(Base):
         Index('idx_entity', 'entity'),
         Index('idx_product', 'product_id'),
     )
+
+
+class UsageLog(Base):
+    __tablename__ = 'usage_logs'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36))
+    user_id = Column(VARCHAR(36))
+    method = Column(VARCHAR(10), nullable=False)
+    path = Column(VARCHAR(500), nullable=False)
+    status_code = Column(Integer)
+    request_size = Column(Integer, default=0)
+    response_size = Column(Integer, default=0)
+    duration_ms = Column(Integer, default=0)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_created', 'created_at'),
+    )

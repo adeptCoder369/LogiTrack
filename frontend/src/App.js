@@ -48,6 +48,7 @@ import Invoices from "./pages/Invoices";
 import Payments from "./pages/Payments";
 import Notes from "./pages/Notes";
 import StockTransfers from "./pages/StockTransfers";
+import UsageDashboard from "./pages/UsageDashboard";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -326,6 +327,12 @@ function AppRoutes() {
       <Route path="/stock-transfers" element={
         <ProtectedRoute permission="Stock Transfers (View)">
           <AppLayout><StockTransfers /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/usage" element={
+        <ProtectedRoute permission="Usage (View)">
+          <AppLayout><UsageDashboard /></AppLayout>
         </ProtectedRoute>
       } />
 

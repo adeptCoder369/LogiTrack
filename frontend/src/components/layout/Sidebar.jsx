@@ -62,6 +62,7 @@ const allNavItems = [
   { to: '/payments', icon: Wallet, label: 'Payments' },
   { to: '/notes', icon: FileBarChart, label: 'Credit / Debit Notes' },
   { to: '/stock-transfers', icon: ArrowRightLeft, label: 'Stock Transfers' },
+  { to: '/usage', icon: BarChart3, label: 'Usage Dashboard' },
   { to: '/regions-locations', icon: Map, label: 'Regions & Locations' },
   { to: '/transporters', icon: TrainFront, label: 'Transporters' },
   { to: '/trucks', icon: Truck, label: 'Trucks' },

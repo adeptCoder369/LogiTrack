@@ -268,4 +268,7 @@ PERMISSION_DEFAULTS = {
     "Stock Transfers (Approve)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Depot Staff": False, "Depot Supervisor": False},
     "Stock Transfers (Update)": {"Admin": True, "Management": True, "Loader": False, "Weightment": True, "Depot Staff": False, "Depot Supervisor": True},
     "Stock Transfers (Delete)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Depot Staff": False, "Depot Supervisor": False},
+
+    # Usage (Phase 6)
+    "Usage (View)": {"Admin": True, "Management": True, "Loader": False, "Weightment": False, "Depot Staff": False, "Depot Supervisor": False},
 }
