@@ -44,6 +44,9 @@ import Leads from "./pages/Leads";
 import Firms from "./pages/Firms";
 import Employees from "./pages/Employees";
 import DepartmentsDesignations from "./pages/DepartmentsDesignations";
+import Invoices from "./pages/Invoices";
+import Payments from "./pages/Payments";
+import Notes from "./pages/Notes";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -298,6 +301,24 @@ function AppRoutes() {
       <Route path="/departments-designations" element={
         <ProtectedRoute permission="Departments (View)">
           <AppLayout><DepartmentsDesignations /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/invoices" element={
+        <ProtectedRoute permission="Invoices (View)">
+          <AppLayout><Invoices /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/payments" element={
+        <ProtectedRoute permission="Payments (View)">
+          <AppLayout><Payments /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/notes" element={
+        <ProtectedRoute permission="Credit Notes (View)">
+          <AppLayout><Notes /></AppLayout>
         </ProtectedRoute>
       } />
 

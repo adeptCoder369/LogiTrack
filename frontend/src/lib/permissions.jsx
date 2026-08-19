@@ -44,6 +44,9 @@ const ROUTE_TO_PERMISSION = {
   '/firms': 'Firms (View)',
   '/employees': 'Employees (View)',
   '/departments-designations': 'Departments (View)',
+  '/invoices': 'Invoices (View)',
+  '/payments': 'Payments (View)',
+  '/notes': 'Credit Notes (View)',
 };
 
 // Map actions to permission keys

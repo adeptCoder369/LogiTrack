@@ -431,6 +431,39 @@ export const designationsApi = {
   delete: (id) => api.delete(`/designations/${id}`),
 };
 
+// Invoicing (Phase 4)
+export const invoicesApi = {
+  getAll: (status) => api.get('/invoices', { params: { status } }),
+  getOne: (id) => api.get(`/invoices/${id}`),
+  generate: (poId, data) => api.post('/invoices/generate', data, { params: { po_id: poId } }),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+  issue: (id) => api.post(`/invoices/${id}/issue`),
+  delete: (id) => api.delete(`/invoices/${id}`),
+  exportPdf: (id) => withDownloadToken(`${API_BASE}/invoices/${id}/export?format=pdf`),
+  exportExcel: (id) => withDownloadToken(`${API_BASE}/invoices/${id}/export?format=excel`),
+  reconcile: (id) => api.get(`/invoices/${id}/reconciliation`),
+  allocate: (id, paymentId, amount) =>
+    api.post(`/invoices/${id}/allocate`, { amount_allocated: amount }, { params: { payment_id: paymentId } }),
+  deallocate: (invoiceId, allocId) => api.delete(`/invoices/${invoiceId}/allocate/${allocId}`),
+};
+
+export const paymentsApi = {
+  getAll: (params) => api.get('/payments', { params }),
+  getOne: (id) => api.get(`/payments/${id}`),
+  create: (data) => api.post('/payments', data),
+  update: (id, data) => api.put(`/payments/${id}`, data),
+  delete: (id) => api.delete(`/payments/${id}`),
+};
+
+export const notesApi = {
+  getCreditNotes: (invoiceId) => api.get('/credit-notes', { params: { invoice_id: invoiceId } }),
+  createCreditNote: (data) => api.post('/credit-notes', data),
+  deleteCreditNote: (id) => api.delete(`/credit-notes/${id}`),
+  getDebitNotes: (invoiceId) => api.get('/debit-notes', { params: { invoice_id: invoiceId } }),
+  createDebitNote: (data) => api.post('/debit-notes', data),
+  deleteDebitNote: (id) => api.delete(`/debit-notes/${id}`),
+};
+
 // Analytics
 export const analyticsApi = {
   getDashboard: () => api.get('/analytics/dashboard'),
