@@ -525,6 +525,27 @@ export const verifiedTrucksApi = {
   delete: (id) => api.delete(`/verified-trucks/${id}`),
 };
 
+// Stock Transfers (Phase 5)
+export const stockTransfersApi = {
+  getAll: (params) => api.get('/stock-transfers', { params }),
+  getOne: (id) => api.get(`/stock-transfers/${id}`),
+  create: (data) => api.post('/stock-transfers', data),
+  approve: (id, notes) => api.post(`/stock-transfers/${id}/approve`, { notes }),
+  dispatch: (id, notes) => api.post(`/stock-transfers/${id}/dispatch`, { notes }),
+  receive: (id, notes) => api.post(`/stock-transfers/${id}/receive`, { notes }),
+  reject: (id, notes) => api.post(`/stock-transfers/${id}/reject`, { notes }),
+  cancel: (id, notes) => api.post(`/stock-transfers/${id}/cancel`, { notes }),
+  getAudit: (id) => api.get(`/stock-transfers/${id}/audit`),
+  exportLedger: () => withDownloadToken(`${API_BASE}/stock-transfers/export`),
+};
+
+export const approvalMatricesApi = {
+  getAll: () => api.get('/approval-matrices'),
+  create: (data) => api.post('/approval-matrices', data),
+  update: (id, data) => api.put(`/approval-matrices/${id}`, data),
+  delete: (id) => api.delete(`/approval-matrices/${id}`),
+};
+
 // File Upload
 export const uploadFile = async (file) => {
   const formData = new FormData();

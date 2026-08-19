@@ -47,6 +47,7 @@ import DepartmentsDesignations from "./pages/DepartmentsDesignations";
 import Invoices from "./pages/Invoices";
 import Payments from "./pages/Payments";
 import Notes from "./pages/Notes";
+import StockTransfers from "./pages/StockTransfers";
 
 // Protected Route Component with Dynamic Permissions
 const ProtectedRoute = ({ children, permission, masterOnly }) => {
@@ -319,6 +320,12 @@ function AppRoutes() {
       <Route path="/notes" element={
         <ProtectedRoute permission="Credit Notes (View)">
           <AppLayout><Notes /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/stock-transfers" element={
+        <ProtectedRoute permission="Stock Transfers (View)">
+          <AppLayout><StockTransfers /></AppLayout>
         </ProtectedRoute>
       } />
 

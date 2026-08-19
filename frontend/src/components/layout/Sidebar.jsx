@@ -32,7 +32,8 @@ import {
   Download,
   Map,
   Target,
-  Network
+  Network,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -60,6 +61,7 @@ const allNavItems = [
   { to: '/invoices', icon: FileBarChart, label: 'Invoices' },
   { to: '/payments', icon: Wallet, label: 'Payments' },
   { to: '/notes', icon: FileBarChart, label: 'Credit / Debit Notes' },
+  { to: '/stock-transfers', icon: ArrowRightLeft, label: 'Stock Transfers' },
   { to: '/regions-locations', icon: Map, label: 'Regions & Locations' },
   { to: '/transporters', icon: TrainFront, label: 'Transporters' },
   { to: '/trucks', icon: Truck, label: 'Trucks' },

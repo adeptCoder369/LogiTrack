@@ -277,6 +277,46 @@ async def list_stock_transfers(
     return await db.stock_transfers.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
 
+@router.get("/stock-transfers/export")
+async def export_stock_transfers(current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Stock Transfers (View)")
+    from fastapi.responses import StreamingResponse
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    from datetime import datetime, timezone
+
+    transfers = await db.stock_transfers.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Stock Transfers"
+    headers = ["Transfer No", "Product", "Qty (MT)", "From", "To", "Status", "Requested By", "Created"]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+    for row_idx, tr in enumerate(transfers, 2):
+        ws.cell(row=row_idx, column=1, value=tr.get("transfer_no", "")).border = thin_border
+        ws.cell(row=row_idx, column=2, value=tr.get("product_name", "")).border = thin_border
+        ws.cell(row=row_idx, column=3, value=tr.get("quantity_mt", 0)).border = thin_border
+        ws.cell(row=row_idx, column=4, value=f"{tr.get('from_type','')} {tr.get('from_name','')}").border = thin_border
+        ws.cell(row=row_idx, column=5, value=f"{tr.get('to_type','')} {tr.get('to_name','')}").border = thin_border
+        ws.cell(row=row_idx, column=6, value=tr.get("status", "")).border = thin_border
+        ws.cell(row=row_idx, column=7, value=tr.get("requested_by_name", "")).border = thin_border
+        ws.cell(row=row_idx, column=8, value=str(tr.get("created_at", ""))[:19]).border = thin_border
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    filename = f"stock_transfers_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
 @router.get("/stock-transfers/{transfer_id}")
 async def get_stock_transfer(transfer_id: str, current_user: dict = Depends(get_current_user)):
     await check_permission(current_user, "Stock Transfers (View)")
