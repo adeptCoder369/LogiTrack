@@ -41,6 +41,46 @@ class TransitionPayload(BaseModel):
     notes: Optional[str] = None
 
 
+class ApprovalMatrixPayload(BaseModel):
+    entity: str = "stock_transfer"
+    product_id: Optional[str] = None
+    amount_threshold: Optional[float] = None
+    approver_roles: list = []
+    active: bool = True
+
+
+async def _resolve_approver_roles(product_id: str, quantity_mt: float):
+    """Most specific matching matrix wins (product-specific, then highest threshold)."""
+    matrices = await db.approval_matrices.find(
+        {"entity": "stock_transfer", "active": {"$ne": False}}, {"_id": 0}
+    ).to_list(1000)
+    if not matrices:
+        return None
+    matching = []
+    for m in matrices:
+        pid = m.get("product_id")
+        thresh = m.get("amount_threshold")
+        if pid and pid != product_id:
+            continue
+        if thresh is not None and quantity_mt < float(thresh):
+            continue
+        matching.append(m)
+    if not matching:
+        return None
+    matching.sort(
+        key=lambda m: (m.get("product_id") is not None, float(m.get("amount_threshold") or 0)),
+        reverse=True,
+    )
+    roles = matching[0].get("approver_roles")
+    if isinstance(roles, str):
+        import json as _json
+        try:
+            roles = _json.loads(roles)
+        except Exception:
+            roles = []
+    return roles or []
+
+
 async def _resolve_party(party_type: str, party_id: str):
     if party_type not in ("Depot", "Company"):
         raise HTTPException(status_code=400, detail="from_type/to_type must be Depot or Company")
@@ -193,6 +233,9 @@ async def approve_transfer(transfer_id: str, payload: TransitionPayload = None, 
     _transfer_or_404(transfer)
     if transfer.get("requested_by") == current_user.get("id"):
         raise HTTPException(status_code=400, detail="Requester cannot approve own transfer")
+    approver_roles = await _resolve_approver_roles(transfer.get("product_id"), float(transfer.get("quantity_mt") or 0))
+    if approver_roles is not None and current_user.get("role") not in approver_roles and not current_user.get("is_master_admin"):
+        raise HTTPException(status_code=403, detail="Your role cannot approve this transfer")
     notes = payload.notes if payload else None
     return await _transition(transfer_id, "Approved", "Approved", current_user, notes=notes)
 
@@ -240,3 +283,52 @@ async def get_transfer_audit(transfer_id: str, current_user: dict = Depends(get_
     await check_permission(current_user, "Stock Transfers (View)")
     await _transfer_or_404(await db.stock_transfers.find_one({"id": transfer_id}))
     return await db.stock_transfer_audit.find({"transfer_id": transfer_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+
+
+# ============ APPROVAL MATRICES ============
+
+@router.get("/approval-matrices")
+async def list_approval_matrices(current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Stock Transfers (Approve)")
+    return await db.approval_matrices.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
+@router.post("/approval-matrices")
+async def create_approval_matrix(data: ApprovalMatrixPayload, current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Stock Transfers (Approve)")
+    if current_user.get("role") != "Management" and not current_user.get("is_master_admin"):
+        raise HTTPException(status_code=403, detail="Only Management can manage approval matrices")
+    row = {
+        "id": str(uuid.uuid4()),
+        "entity": data.entity,
+        "product_id": data.product_id,
+        "amount_threshold": data.amount_threshold,
+        "approver_roles": data.approver_roles or [],
+        "active": data.active,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.approval_matrices.insert_one(row)
+    return row
+
+
+@router.put("/approval-matrices/{matrix_id}")
+async def update_approval_matrix(matrix_id: str, data: ApprovalMatrixPayload, current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Stock Transfers (Approve)")
+    if current_user.get("role") != "Management" and not current_user.get("is_master_admin"):
+        raise HTTPException(status_code=403, detail="Only Management can manage approval matrices")
+    existing = await db.approval_matrices.find_one({"id": matrix_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Approval matrix not found")
+    await db.approval_matrices.update_one({"id": matrix_id}, {"$set": data.model_dump()})
+    return await db.approval_matrices.find_one({"id": matrix_id}, {"_id": 0})
+
+
+@router.delete("/approval-matrices/{matrix_id}")
+async def delete_approval_matrix(matrix_id: str, current_user: dict = Depends(get_current_user)):
+    await check_permission(current_user, "Stock Transfers (Approve)")
+    if current_user.get("role") != "Management" and not current_user.get("is_master_admin"):
+        raise HTTPException(status_code=403, detail="Only Management can manage approval matrices")
+    result = await db.approval_matrices.delete_one({"id": matrix_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Approval matrix not found")
+    return {"message": "Approval matrix deleted"}

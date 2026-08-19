@@ -1094,3 +1094,20 @@ class StockTransferAudit(Base):
         Index('idx_tenant', 'tenant_id'),
         Index('idx_transfer', 'transfer_id'),
     )
+
+
+class ApprovalMatrix(Base):
+    __tablename__ = 'approval_matrices'
+    id = Column(VARCHAR(36), primary_key=True)
+    tenant_id = Column(VARCHAR(36), nullable=False)
+    entity = Column(VARCHAR(100), nullable=False, default='stock_transfer')
+    product_id = Column(VARCHAR(36))
+    amount_threshold = Column(Float)
+    approver_roles = Column(JSON)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, nullable=False)
+    __table_args__ = (
+        Index('idx_tenant', 'tenant_id'),
+        Index('idx_entity', 'entity'),
+        Index('idx_product', 'product_id'),
+    )
