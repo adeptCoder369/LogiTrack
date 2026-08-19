@@ -14,6 +14,7 @@ from models import (
     PurchaseOrder
 )
 from config import KNOWN_MODULES
+from extensions.registry import trigger as ext_trigger
 
 router = APIRouter(tags=["Companies"])
 
@@ -47,6 +48,7 @@ async def _validate_parent_client(company_id: Optional[str], self_id: Optional[s
 @router.post("/companies", response_model=Company)
 async def create_company(data: CompanyCreate, current_user: dict = Depends(get_current_user)):
     await check_permission(current_user, "Companies (Create)")
+    await ext_trigger("pre_create:companies", {"data": data.model_dump(), "user": current_user})
     payload = data.model_dump()
     payload["entity_roles"] = await _validate_entity_roles(payload.get("entity_roles"))
     await _validate_parent_client(payload.get("parent_client_id"))
@@ -54,6 +56,7 @@ async def create_company(data: CompanyCreate, current_user: dict = Depends(get_c
         payload["is_client"] = True
     company = Company(**payload, added_by=current_user["name"])
     await db.companies.insert_one(company.model_dump())
+    await ext_trigger("post_create:companies", {"company": company.model_dump(), "user": current_user})
     return company
 
 @router.get("/companies", response_model=List[Company])

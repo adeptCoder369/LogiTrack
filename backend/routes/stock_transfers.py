@@ -15,6 +15,7 @@ import json
 
 from .db_compat import db
 from auth_utils import get_current_user, check_permission
+from extensions.registry import trigger as ext_trigger
 
 router = APIRouter(tags=["Stock Transfers"])
 
@@ -221,6 +222,8 @@ async def create_stock_transfer(data: StockTransferCreate, current_user: dict = 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    await ext_trigger("pre_create:stock_transfers", {"data": data.model_dump(), "user": current_user})
+
     from_name = await _resolve_party(data.from_type, data.from_id)
     to_name = await _resolve_party(data.to_type, data.to_id)
 
@@ -250,6 +253,7 @@ async def create_stock_transfer(data: StockTransferCreate, current_user: dict = 
     }
     await db.stock_transfers.insert_one(transfer)
     await _audit(transfer_id, "Requested", current_user, {"quantity_mt": data.quantity_mt})
+    await ext_trigger("post_create:stock_transfers", {"transfer": transfer, "user": current_user})
 
     # Reserve stock at the source so it cannot be consumed elsewhere.
     try:

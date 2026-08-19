@@ -1757,6 +1757,7 @@ async def get_dashboard_analytics(current_user: dict = Depends(get_current_user)
 
 # ============ ROUTE INCLUSION ============
 
+import extensions.sample_hello  # noqa: F401 — registers sample hooks
 from routes import (
     reports_router, companies_router, transporters_router, trucks_router,
     products_router, railway_sidings_router, railway_zones_router, depots_router,
@@ -1767,6 +1768,7 @@ from routes import (
     locations_router, leads_router, firms_router, employees_router,
     invoicing_router, payments_router, notes_router, stock_transfers_router, usage_router, billing_router
 )
+from routes.extensions import router as extensions_router
 
 api_router.include_router(reports_router)
 api_router.include_router(companies_router)
@@ -1799,6 +1801,7 @@ api_router.include_router(notes_router)
 api_router.include_router(stock_transfers_router)
 api_router.include_router(usage_router)
 api_router.include_router(billing_router)
+api_router.include_router(extensions_router)
 
 app.include_router(api_router)
 

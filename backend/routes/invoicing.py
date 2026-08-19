@@ -15,6 +15,7 @@ import io
 
 from .db_compat import db
 from auth_utils import get_current_user, get_download_user, check_permission
+from extensions.registry import trigger as ext_trigger
 
 router = APIRouter(tags=["Invoices"])
 
@@ -147,6 +148,8 @@ async def generate_invoice(payload: GeneratePayload, po_id: str, current_user: d
     subtotal = round(quantity * rate, 2)
     gst_amount = round(subtotal * float(payload.gst_rate) / 100, 2)
     total = round(subtotal + gst_amount, 2)
+
+    await ext_trigger("validate:invoice", {"invoice": {"subtotal": subtotal, "total_amount": total, "po_id": po_id}, "user": current_user})
 
     now = datetime.now(timezone.utc).isoformat()
     count = await db.invoices.count_documents({})

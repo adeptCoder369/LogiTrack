@@ -30,6 +30,7 @@ from .notes import router as notes_router
 from .stock_transfers import router as stock_transfers_router
 from .usage import router as usage_router
 from .billing import router as billing_router
+from .extensions import router as extensions_router
 
 __all__ = [
     'reports_router', 'companies_router', 'transporters_router',
@@ -40,5 +41,5 @@ __all__ = [
     'verified_trucks_router', 'company_inventory_router', 'tenants_router',
     'source_access_router', 'sources_router', 'product_management_router',
     'locations_router', 'leads_router', 'firms_router', 'employees_router',
-    'invoicing_router', 'payments_router', 'notes_router', 'stock_transfers_router', 'usage_router', 'billing_router',
+    'invoicing_router', 'payments_router', 'notes_router', 'stock_transfers_router', 'usage_router', 'billing_router', 'extensions_router',
 ]
