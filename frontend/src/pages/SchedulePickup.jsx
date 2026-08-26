@@ -418,7 +418,8 @@ company_id: currentUser?.role === "Transporter" ? (mappedCompanyIds[0] || "") : 
   const validatePlanRows = () => {
     const seen = new Set();
 
-    for (let r of rows) {
+    for (let index = 0; index < rows.length; index++) {
+      const r = rows[index];
       if (!r.source_id || !r.source_name) {
         toast.error(
           `Source is missing for row ${index + 1}. Please select the source again.`

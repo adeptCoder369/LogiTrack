@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Truck, ArrowLeft, Phone, Lock, KeyRound, RefreshCw, UserPlus } from 'lucide-react';
+import { Truck, ArrowLeft, Phone, Lock, KeyRound, RefreshCw, UserPlus, ShieldCheck, Package, Warehouse, BarChart3, Building2, ArrowRightLeft } from 'lucide-react';
 
 const COUNTRY_CODES = [
   { code: "91", name: "India", flag: "🇮🇳" },
@@ -714,18 +714,77 @@ export default function Login() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {renderHeader()}
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left — Brand / Story (hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-[52%] brand-gradient relative flex-col justify-between p-10 xl:p-14 text-white overflow-hidden">
+        {/* subtle pattern */}
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+              <Truck className="w-5 h-5 text-slate-900" />
+            </div>
+            <span className="text-lg font-bold tracking-widest uppercase" style={{ fontFamily: 'Manrope' }}>IBRMCO Pro</span>
+            <span className="ml-2 px-2 py-0.5 rounded bg-white/20 text-[10px] font-bold tracking-wider">v2.1</span>
+          </div>
+          <h1 className="text-4xl xl:text-[42px] font-extrabold leading-tight" style={{ fontFamily: 'Manrope' }}>
+            Logistics,<br />Unified.
+          </h1>
+          <p className="mt-4 text-white/80 text-sm xl:text-[15px] leading-relaxed max-w-md">
+            Multi-tenant SaaS for depots, inventory, dispatches and billing — one workspace per client, one login per role.
+          </p>
+          <div className="mt-8 grid grid-cols-1 gap-3 max-w-sm">
+            {[
+              { icon: Warehouse, label: 'Inventory Wallet', desc: 'Real-time depot & company stock' },
+              { icon: ArrowRightLeft, label: 'Stock Transfers', desc: 'Depot ↔ Company with approvals' },
+              { icon: Building2, label: 'Tenants & Branding', desc: 'Workspace + primary/accent per client' },
+              { icon: ShieldCheck, label: 'Role-based Access', desc: 'Products / Depots / Tenants scoped' },
+            ].map(item => (
+              <div key={item.label} className="flex gap-3 items-center bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/10">
+                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
+                  <item.icon className="w-4 h-4 text-slate-900" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold leading-none">{item.label}</p>
+                  <p className="text-xs text-white/70 leading-none mt-1">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="relative z-10 flex items-center justify-between text-xs text-white/60">
+          <span>Powered by InfoEIGHT</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> Secure</span>
+        </div>
+      </div>
 
-        {activeView === 'main' && renderMainLogin()}
-        {activeView === 'loginOtp' && renderLoginOtp()}
-        {activeView === 'forgotPassword' && renderForgotPassword()}
-        {activeView === 'firstTimeSetup' && renderFirstTimeSetup()}
-
-        <p className="text-center text-slate-500 mt-6 text-sm">
-          IBRMCO  v2.1 | InfoEIGHT Solutions
-        </p>
+      {/* Right — Form */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10 bg-slate-50">
+        {/* Mobile brand header */}
+        <div className="lg:hidden flex items-center gap-2.5 mb-6 w-full max-w-md">
+          <div className="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center shadow">
+            <Truck className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold tracking-widest uppercase text-slate-900" style={{ fontFamily: 'Manrope' }}>IBRMCO Pro</p>
+            <p className="text-xs text-slate-500">Powered by InfoEIGHT</p>
+          </div>
+        </div>
+        <div className="w-full max-w-md">
+          {/* subtle tenant hint */}
+          <div className="mb-4 flex items-center justify-center gap-2 text-[11px] text-slate-500">
+            <span className="px-2 py-1 rounded-full bg-white border text-slate-600">Tenant slug required only if mobile in multiple workspaces</span>
+          </div>
+          {activeView === 'main' && renderMainLogin()}
+          {activeView === 'loginOtp' && renderLoginOtp()}
+          {activeView === 'forgotPassword' && renderForgotPassword()}
+          {activeView === 'firstTimeSetup' && renderFirstTimeSetup()}
+          <p className="text-center text-slate-400 mt-6 text-xs">
+            IBRMCO v2.1 • InfoEIGHT Solutions 
+          </p>
+        </div>
       </div>
     </div>
   );

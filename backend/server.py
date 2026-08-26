@@ -615,6 +615,18 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
         existing_name = existing.name or "This user"
         raise HTTPException(status_code=400, detail=f"{existing_name} has already been assigned this number")
     user_id = str(uuid.uuid4())
+    # B: respect requested company_id (form) or fallback to caller's company
+    requested_company_id = data.company_id
+    if requested_company_id:
+        # validate requested company belongs to caller's tenant
+        async with AsyncSessionLocal() as session:
+            stmt = select(sql_models.Company).where(sql_models.Company.id == requested_company_id)
+            tfilter = tenant_filter(sql_models.Company)
+            if tfilter is not None:
+                stmt = stmt.where(tfilter)
+            comp = (await session.execute(stmt)).scalar_one_or_none()
+            if not comp:
+                raise HTTPException(status_code=400, detail="Selected company not found in your workspace")
     user_doc = sql_models.User(
         id=user_id,
         tenant_id=tenant_id_for_current_user(current_user),
@@ -627,7 +639,7 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
         role=data.role,
         email=data.email,
         depot_id=data.depot_id,
-        company_id=None if data.role == "Transporter" else current_user.get("company_id"),
+        company_id=None if data.role == "Transporter" else (requested_company_id or current_user.get("company_id")),
         assigned_products=data.assigned_products,
         assigned_depots=data.assigned_depots,
         excluded_products=[],
@@ -654,7 +666,7 @@ async def admin_create_user(data: AdminCreateUserRequest, current_user: dict = D
                 async with AsyncSessionLocal() as session:
                     session.add(transporter)
                     await session.commit()
-    if data.role != "Transporter" and not current_user.get("company_id") and not current_user.get("is_master_admin"):
+    if data.role != "Transporter" and not user_doc.company_id and not current_user.get("is_master_admin"):
         raise HTTPException(400, "User must belong to a company")
     async with AsyncSessionLocal() as session:
         session.add(user_doc)

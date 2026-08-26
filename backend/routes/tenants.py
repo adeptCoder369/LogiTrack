@@ -137,6 +137,22 @@ async def create_tenant(data: TenantCreate, current_user: dict = Depends(get_cur
         )
         session.add(tenant)
         await session.flush()  # get tenant.id for FK before commit
+        # A: create default Client company for the tenant so owner has a company
+        default_company = sql_models.Company(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant.id,
+            name=f"{data.name} Default Company",
+            entity_roles=["Client", "Company"],
+            is_client=True,
+            company_type="Client",
+            city="Delhi",
+            state="Delhi",
+            country="India",
+            created_at=datetime.now(timezone.utc),
+            added_by=current_user.get("name") or "Master Admin",
+        )
+        session.add(default_company)
+        await session.flush()
         owner_user = None
         if owner_mobile:
             # per-tenant duplicate check (new tenant has no users yet, but guard anyway)
@@ -158,6 +174,7 @@ async def create_tenant(data: TenantCreate, current_user: dict = Depends(get_cur
                 password_set=False,
                 role="Management",
                 email=owner_email,
+                company_id=default_company.id,
                 otp_verified=False,
                 is_master_admin=False,
                 assigned_products=[],
@@ -171,6 +188,11 @@ async def create_tenant(data: TenantCreate, current_user: dict = Depends(get_cur
         await session.commit()
         await session.refresh(tenant)
     result = _to_dict(tenant)
+    # include default company for frontend convenience
+    result["default_company"] = {
+        "id": default_company.id,
+        "name": default_company.name,
+    }
     if owner_mobile:
         result["owner"] = {
             "id": owner_user.id,
@@ -178,6 +200,7 @@ async def create_tenant(data: TenantCreate, current_user: dict = Depends(get_cur
             "mobile": owner_mobile,
             "email": owner_email,
             "role": "Management",
+            "company_id": default_company.id,
             "password_set": False,
         }
     return result
