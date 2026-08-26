@@ -1,0 +1,209 @@
+  tables ensured (create_all)
+  migration 02_verified_trucks_pickup_link.sql skipped (already applied)
+  migration 03_pickups_rejection_audit.sql skipped (already applied)
+  migration 04_tenancy.sql stmt failed: (1062, "Duplicate entry '11111111-1111-1111-1111-111111111111' for key 'tenants.PRIMARY'")
+  migration 04_tenancy.sql partially applied (44 ok, 35 skipped, 1 failed)
+  migration 05_depot_ownership.sql skipped (already applied)
+  migration 06_source_products.sql skipped (already applied)
+  migration 07_po_source.sql applied (1 stmts, 1 skipped)
+  migration 08_product_overrides.sql skipped (already applied)
+  migration 09_location_hierarchy.sql skipped (already applied)
+  migration 10_client_structure.sql skipped (already applied)
+  migration 11_leads.sql skipped (already applied)
+  migration 12_firms.sql skipped (already applied)
+  migration 13_client_modules.sql skipped (already applied)
+  migration 14_employees.sql skipped (already applied)
+  migration 15_invoices.sql skipped (already applied)
+  migration 16_payments.sql skipped (already applied)
+  migration 17_notes.sql skipped (already applied)
+  migration 18_stock_transfers.sql skipped (already applied)
+  migration 19_approval_matrices.sql skipped (already applied)
+  migration 20_inventory_locks.sql skipped (already applied)
+  migration 21_usage_logs.sql skipped (already applied)
+  migration 22_subscriptions.sql skipped (already applied)
+
+Wiping demo...
+  wiped tenant 48128eb0
+
+== Seeding tenant demo (48128eb0) ==
+  regions/locations: 2/3
+  DEBUG seed companies tid=48128eb0-51f0-5ca9-ae76-56f6c1abbdd5 slug=demo
+  DEBUG c_source tenant_id=48128eb0-51f0-5ca9-ae76-56f6c1abbdd5 id=feb1833c-fa67-5d37-aa9b-e6d63c3da3ce
+  DEBUG companies for demo count=4
+  companies: 4 (source, parent, 2 children)
+  depots: 3
+  products: 3
+  source_products: 4 (tests '2 products 1 permission')
+  overrides/pricing: 1/3
+  offices/factories: 2/1
+  departments/designations: 3/4
+  transporters/trucks: 2/5
+  users: 8 (Management..Dispatch Verifier)
+  employees: 6 (4 Internal, 2 External) + 1 linked
+  client_modules: 6
+  leads: 5 (incl 1 Converted)
+  firms: 2 + offices 2 + factories 1 + firm_access 2 (Weightment)
+  DEBUG delivery_orders tid=48128eb0-51f0-5ca9-ae76-56f6c1abbdd5 slug=demo
+  DEBUG do1 tenant_id=48128eb0-51f0-5ca9-ae76-56f6c1abbdd5 id=954e7bea-9299-5551-80f1-5106912cf0f9
+  delivery_orders: 3
+  purchase_orders: 3
+Traceback (most recent call last):
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 230, in execute
+    self._adapt_connection._handle_exception(error)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 368, in _handle_exception
+    raise error.with_traceback(exc_info[2])
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 228, in execute
+    return self.await_(self._execute_async(operation, parameters))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 251, in _execute_async
+    result = await self._cursor.execute(operation, parameters)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\cursors.py", line 239, in execute
+    await self._query(query)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\cursors.py", line 457, in _query
+    await conn.query(q)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 469, in query
+    await self._read_query_result(unbuffered=unbuffered)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 683, in _read_query_result
+    await result.read()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 1164, in read
+    first_packet = await self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 652, in _read_packet
+    packet.raise_for_error()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\pymysql\protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\pymysql\err.py", line 154, in raise_mysql_exception
+    raise errorclass(errno, errval, sqlstate=sqlstate)
+pymysql.err.IntegrityError: (1062, "Duplicate entry '5e55d7a8-dfa3-5f4c-be05-a07b6c1f6fc7' for key 'company_inventory.PRIMARY'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\WORK\logiTrack-PHASE_2\backend\scripts\seed_demo.py", line 587, in <module>
+    asyncio.run(main())
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\asyncio\base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "D:\WORK\logiTrack-PHASE_2\backend\scripts\seed_demo.py", line 569, in main
+    r = await seed_one_tenant(t, password)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\WORK\logiTrack-PHASE_2\backend\scripts\seed_demo.py", line 387, in seed_one_tenant
+    await s.commit()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 999, in commit
+    await greenlet_spawn(self.sync_session.commit)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
+    result = context.switch(value)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1049, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 230, in execute
+    self._adapt_connection._handle_exception(error)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 368, in _handle_exception
+    raise error.with_traceback(exc_info[2])
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 228, in execute
+    return self.await_(self._execute_async(operation, parameters))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 251, in _execute_async
+    result = await self._cursor.execute(operation, parameters)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\cursors.py", line 239, in execute
+    await self._query(query)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\cursors.py", line 457, in _query
+    await conn.query(q)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 469, in query
+    await self._read_query_result(unbuffered=unbuffered)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 683, in _read_query_result
+    await result.read()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 1164, in read
+    first_packet = await self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 652, in _read_packet
+    packet.raise_for_error()
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\pymysql\protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\pymysql\err.py", line 154, in raise_mysql_exception
+    raise errorclass(errno, errval, sqlstate=sqlstate)
+sqlalchemy.exc.IntegrityError: (pymysql.err.IntegrityError) (1062, "Duplicate entry '5e55d7a8-dfa3-5f4c-be05-a07b6c1f6fc7' for key 'company_inventory.PRIMARY'")
+[SQL: INSERT INTO company_inventory (id, tenant_id, company_id, company_name, product_id, product_name, product_code, total_received, total_dispatched, available_quantity, locked_qty, last_updated) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)]
+[parameters: ('5e55d7a8-dfa3-5f4c-be05-a07b6c1f6fc7', '48128eb0-51f0-5ca9-ae76-56f6c1abbdd5', 'd3710278-cf7e-53e7-b07a-f489a4f66e92', 'Demo Logistics Client A', '1f3ef0b6-7900-550d-94bd-a1279a28eda0', 'Cement OPC 53', 'CEM-001', 40, 0, 40, 0, datetime.datetime(2026, 8, 24, 10, 33, 16, 907341, tzinfo=datetime.timezone.utc))]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Exception ignored in: <function Connection.__del__ at 0x00000216607F2AC0>
+Traceback (most recent call last):
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 1131, in __del__
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\site-packages\aiomysql\connection.py", line 339, in close
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\asyncio\proactor_events.py", line 109, in close
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\asyncio\base_events.py", line 762, in call_soon
+  File "C:\Users\pc\AppData\Local\Programs\Python\Python311\Lib\asyncio\base_events.py", line 520, in _check_closed
+RuntimeError: Event loop is closed

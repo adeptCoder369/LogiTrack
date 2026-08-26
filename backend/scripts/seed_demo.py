@@ -96,12 +96,53 @@ TENANT_TABLES = [
 ]
 
 async def wipe_tenant(tenant_id):
-    async with AsyncSessionLocal() as s:
-        for model in TENANT_TABLES:
-            if not hasattr(model, "tenant_id"):
-                continue
-            await s.execute(delete(model).where(model.tenant_id == tenant_id))
-        await s.commit()
+    from sqlalchemy.exc import ProgrammingError
+    slug = None
+    for t in DEMO_TENANTS:
+        if t["id"] == tenant_id:
+            slug = t["slug"]
+            break
+    stale_ids = set()
+    if slug:
+        for tbl, name in [
+            ("company","source"),("company","parent"),("company","child1"),("company","child2"),
+            ("depot","north"),("depot","west"),("depot","jaipur"),
+            ("product","cement"),("product","steel"),("product","aggregate"),
+            ("transporter","1"),("transporter","2"),
+            ("user","1"),("user","2"),("user","3"),("user","4"),("user","5"),("user","6"),("user","7"),("user","8"),
+        ]:
+            stale_ids.add(did(slug, tbl, name))
+        for i in range(1,6):
+            stale_ids.add(did(slug,"truck",str(i)))
+        for n in ["north","west"]:
+            stale_ids.add(did(slug,"region",n))
+        for n in ["delhi","jaipur","mumbai"]:
+            stale_ids.add(did(slug,"loc",n))
+        for n in ["1","2","3"]:
+            stale_ids.add(did(slug,"rs",n))
+            stale_ids.add(did(slug,"rz",n))
+        stale_ids.discard("")
+
+    for model in TENANT_TABLES:
+        try:
+            async with AsyncSessionLocal() as s:
+                if hasattr(model, "tenant_id"):
+                    await s.execute(delete(model).where(model.tenant_id == tenant_id))
+                    await s.commit()
+        except ProgrammingError as e:
+            if "1146" not in str(e) and "doesn't exist" not in str(e):
+                raise
+        except Exception:
+            pass
+        if stale_ids and hasattr(model, "id"):
+            try:
+                async with AsyncSessionLocal() as s:
+                    await s.execute(delete(model).where(model.id.in_(list(stale_ids))))
+                    await s.commit()
+            except ProgrammingError:
+                pass
+            except Exception:
+                pass
     print(f"  wiped tenant {tenant_id[:8]}")
 
 async def ensure_tenant(t):
@@ -151,18 +192,18 @@ async def seed_one_tenant(t, password):
         await s.commit()
         print(f"  companies: 4 (source, parent, 2 children)")
 
-        # depots
-        d1 = m.Depot(id=did(slug,"depot","north"), tenant_id=tid, company_id=c_source.id, location_id=l1.id, name=f"{slug.upper()} Depot North", city="Delhi", state="Delhi", location="Delhi NCR", warehouse_type="Covered", storage_capacity=5000, assigned_roles=["Weightment","Depot Staff"], created_at=now())
-        d2 = m.Depot(id=did(slug,"depot","west"), tenant_id=tid, company_id=c_source.id, location_id=l3.id, name=f"{slug.upper()} Depot West", city="Mumbai", state="Maharashtra", location="Mumbai", warehouse_type="Open Yard", storage_capacity=3000, assigned_roles=["Weightment"], created_at=now())
-        d3 = m.Depot(id=did(slug,"depot","jaipur"), tenant_id=tid, company_id=c_child1.id, location_id=l2.id, name=f"{slug.upper()} Depot Jaipur", city="Jaipur", state="Rajasthan", location="Jaipur", warehouse_type="Covered", storage_capacity=2000, assigned_roles=[], created_at=now())
+        # depots (Management/Admin see all for demo)
+        d1 = m.Depot(id=did(slug,"depot","north"), tenant_id=tid, company_id=c_source.id, location_id=l1.id, name=f"{slug.upper()} Depot North", city="Delhi", state="Delhi", location="Delhi NCR", warehouse_type="Covered", storage_capacity=5000, assigned_roles=["Management","Admin","Weightment","Depot Staff"], created_at=now())
+        d2 = m.Depot(id=did(slug,"depot","west"), tenant_id=tid, company_id=c_source.id, location_id=l3.id, name=f"{slug.upper()} Depot West", city="Mumbai", state="Maharashtra", location="Mumbai", warehouse_type="Open Yard", storage_capacity=3000, assigned_roles=["Management","Admin","Weightment"], created_at=now())
+        d3 = m.Depot(id=did(slug,"depot","jaipur"), tenant_id=tid, company_id=c_child1.id, location_id=l2.id, name=f"{slug.upper()} Depot Jaipur", city="Jaipur", state="Rajasthan", location="Jaipur", warehouse_type="Covered", storage_capacity=2000, assigned_roles=["Management","Admin"], created_at=now())
         s.add_all([d1,d2,d3])
         await s.commit()
         print(f"  depots: 3")
 
-        # products
-        p1 = m.Product(id=did(slug,"product","cement"), tenant_id=tid, product_name="Cement OPC 53", product_code="CEM-001", category="Cement", hsn_code="2523", unit_of_measurement="MT", assigned_roles=["Weightment","Depot Staff"], created_at=now())
-        p2 = m.Product(id=did(slug,"product","steel"), tenant_id=tid, product_name="Steel TMT 500D", product_code="STL-001", category="Steel", hsn_code="7214", assigned_roles=["Weightment"], created_at=now())
-        p3 = m.Product(id=did(slug,"product","aggregate"), tenant_id=tid, product_name="Aggregate 20mm", product_code="AGG-001", category="Aggregates", hsn_code="2517", assigned_roles=[], created_at=now())
+        # products (Management/Admin see all; Weightment/Depot Staff see subset for "2 products 1 permission" demo)
+        p1 = m.Product(id=did(slug,"product","cement"), tenant_id=tid, product_name="Cement OPC 53", product_code="CEM-001", category="Cement", hsn_code="2523", unit_of_measurement="MT", assigned_roles=["Management","Admin","Weightment","Depot Staff"], created_at=now())
+        p2 = m.Product(id=did(slug,"product","steel"), tenant_id=tid, product_name="Steel TMT 500D", product_code="STL-001", category="Steel", hsn_code="7214", assigned_roles=["Management","Admin","Weightment","Depot Staff"], created_at=now())
+        p3 = m.Product(id=did(slug,"product","aggregate"), tenant_id=tid, product_name="Aggregate 20mm", product_code="AGG-001", category="Aggregates", hsn_code="2517", assigned_roles=["Management","Admin"], created_at=now())
         s.add_all([p1,p2,p3])
         await s.commit()
         print(f"  products: 3")
@@ -342,7 +383,8 @@ async def seed_one_tenant(t, password):
         liftings = []
         for i, (lt, us) in enumerate([("Primary","Pending"),("Primary","Verified"),("Primary","Rejected"),("Primary","Verified"),("Secondary","Verified"),("Secondary","Pending")], start=1):
             lid = did(slug,"lifting",str(i))
-            liftings.append(m.Lifting(id=lid, tenant_id=tid, lifting_type=lt, transport_mode="Road", company_id=c_source.id if lt=="Primary" else c_child1.id, delivery_order_id=do1.id if lt=="Primary" else None, purchase_order_id=po2.id if lt=="Secondary" and i==5 else None, product_id=p1.id if i%2==1 else p2.id, product_name=p1.product_name if i%2==1 else p2.product_name, quantity_mt=25 if i<=3 else 15, loading_point_type="Company" if lt=="Primary" else "Depot", loading_point_id=c_source.id if lt=="Primary" else d1.id, loading_point_name=c_source.name if lt=="Primary" else d1.name, vehicle_id=trucks[i-1].id, vehicle_number=trucks[i-1].vehicle_number, transporter_name=tr1.name, driver_name=f"Driver {i}", driver_mobile=f"900000001{i}", lifting_no=f"LFT-{slug.upper()}-{i:06d}", loading_status="Loaded", unloading_status=us, created_at=now()))
+            trk = trucks[(i-1)%len(trucks)]
+            liftings.append(m.Lifting(id=lid, tenant_id=tid, lifting_type=lt, transport_mode="Road", company_id=c_source.id if lt=="Primary" else c_child1.id, delivery_order_id=do1.id if lt=="Primary" else None, purchase_order_id=po2.id if lt=="Secondary" and i==5 else None, product_id=p1.id if i%2==1 else p2.id, product_name=p1.product_name if i%2==1 else p2.product_name, quantity_mt=25 if i<=3 else 15, loading_point_type="Company" if lt=="Primary" else "Depot", loading_point_id=c_source.id if lt=="Primary" else d1.id, loading_point_name=c_source.name if lt=="Primary" else d1.name, vehicle_id=trk.id, vehicle_number=trk.vehicle_number, transporter_name=tr1.name, driver_name=f"Driver {i}", driver_mobile=f"900000001{i}", lifting_no=f"LFT-{slug.upper()}-{i:06d}", loading_status="Loaded", unloading_status=us, created_at=now()))
         s.add_all(liftings)
         await s.commit()
         print(f"  liftings: 6")
@@ -432,6 +474,71 @@ async def main():
     password = args.password
 
     targets = DEMO_TENANTS if args.tenant=="all" else [t for t in DEMO_TENANTS if t["slug"]==args.tenant]
+
+    # ensure all tables exist (idempotent, creates missing ones from migrations 04-22)
+    try:
+        from database import engine, Base
+        import models_sqlalchemy  # noqa: ensure models imported
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("  tables ensured (create_all)")
+    except Exception as e:
+        print(f"  warning: create_all failed: {e}")
+
+    # apply pending migrations 05-22 (create_all doesn't add columns)
+    try:
+        import re, pymysql
+        from urllib.parse import urlparse, unquote
+        import os
+        db_url = os.environ.get("MYSQL_URL","")
+        if db_url:
+            u = urlparse(db_url.replace("mysql+aiomysql://","mysql://"))
+            pw = unquote(u.password or "")
+            conn = pymysql.connect(host=u.hostname, port=u.port or 3306, user=u.username, password=pw, database=u.path.lstrip("/"), ssl={"ssl": True}, autocommit=True)
+            cur = conn.cursor()
+            mig_dir = ROOT / "migrations"
+            for fname in sorted([p.name for p in mig_dir.glob("*.sql")]):
+                # 02..22 (03 adds pickups rejection audit, 02 adds verified_trucks link)
+                if not re.match(r"^(0[2-9]|1[0-9]|2[0-2])_", fname):
+                    continue
+                text = (mig_dir / fname).read_text(encoding="utf-8")
+                # strip -- comments (full line and inline) before splitting
+                import re as _re
+                # remove -- comments (to end of line)
+                text_no_comments = _re.sub(r"--[^\n]*", "", text)
+                stmts = []
+                for raw in text_no_comments.split(";"):
+                    stmt = raw.strip()
+                    if stmt:
+                        stmts.append(stmt)
+                applied = 0
+                skipped = 0
+                failed = 0
+                for stmt in stmts:
+                    try:
+                        cur.execute(stmt)
+                        applied += 1
+                    except pymysql.err.OperationalError as e:
+                        msg = str(e).lower()
+                        if "already exists" in msg or "duplicate column" in msg or "duplicate key" in msg or "duplicate entry" in msg:
+                            skipped += 1
+                        else:
+                            print(f"  migration {fname} stmt failed: {e}\n    {stmt[:120]}")
+                            failed += 1
+                    except Exception as e:
+                        print(f"  migration {fname} stmt failed: {e}")
+                        failed += 1
+                if failed == 0:
+                    if applied > 0:
+                        print(f"  migration {fname} applied ({applied} stmts, {skipped} skipped)")
+                    else:
+                        print(f"  migration {fname} skipped (already applied)")
+                else:
+                    print(f"  migration {fname} partially applied ({applied} ok, {skipped} skipped, {failed} failed)")
+            cur.close()
+            conn.close()
+    except Exception as e:
+        print(f"  warning: migration apply failed: {e}")
 
     for t in targets:
         if args.fresh:

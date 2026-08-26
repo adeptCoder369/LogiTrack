@@ -178,4 +178,4 @@ async def test_product_ids_unrestricted_for_management(monkeypatch):
     monkeypatch.setattr(auth_utils, "get_user_firm_granted_pairs", fake_pairs)
     monkeypatch.setattr(auth_utils, "AsyncSessionLocal", lambda: FakeSession([]))
 
-    assert await get_user_product_ids(make_user(role="Management")) == []
+    assert await get_user_product_ids(make_user(role="Management")) is None

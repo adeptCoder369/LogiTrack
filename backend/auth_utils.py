@@ -235,7 +235,7 @@ def role_in_assigned_roles(column, role: str):
 
 
 async def get_user_product_ids(user: dict) -> Optional[List[str]]:
-    if user.get("is_master_admin"):
+    if user.get("is_master_admin") or user.get("role") == "Management":
         return None
 
     assigned_products = set(user.get("assigned_products") or [])
@@ -265,7 +265,7 @@ async def get_user_product_ids(user: dict) -> Optional[List[str]]:
     return list(effective_products)
 
 async def get_user_depot_ids(user: dict) -> Optional[List[str]]:
-    if user.get("is_master_admin"):
+    if user.get("is_master_admin") or user.get("role") == "Management":
         return None
 
     assigned_depots = set(user.get("assigned_depots") or [])

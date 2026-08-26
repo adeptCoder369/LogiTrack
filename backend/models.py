@@ -75,6 +75,11 @@ class CompanyBase(BaseModel):
     name: str
     entity_roles: List[str] = []
     parent_client_id: Optional[str] = None
+
+    @field_validator('entity_roles', mode='before')
+    @classmethod
+    def _coerce_entity_roles(cls, v):
+        return v if isinstance(v, list) else (v or [])
     trade_name: Optional[str] = None
     logo_file_id: Optional[str] = None
     location: Optional[str] = None
@@ -109,14 +114,22 @@ class CompanyCreate(CompanyBase):
 
 class Company(CompanyBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    added_on: Optional[str] = None
+    added_on: Optional[str] = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     added_by: Optional[str] = None
     users: List[dict] = []
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     @field_validator('users', mode='before')
     @classmethod
     def _coerce_users(cls, v):
         return v if isinstance(v, list) else (v or [])
+
+    @field_validator('added_on', 'created_at', mode='before')
+    @classmethod
+    def _coerce_datetimes(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
 
 class CompanyUserBase(BaseModel):
     name: str
@@ -623,3 +636,15 @@ class Pickup(PickupBase):
     final_verified_by: Optional[str] = None
     final_verified_by_name: Optional[str] = None
     final_verified_at: Optional[str] = None
+
+    @field_validator('weight_slips', 'tare_slip_upload_history', 'weightment_slip_upload_history', mode='before')
+    @classmethod
+    def _coerce_pickup_lists(cls, v):
+        return v if isinstance(v, list) else (v or [])
+
+    @field_validator('created_at', 'loading_start_time', 'loading_end_time', 'verified_at', 'rejected_at', 'final_verified_at', mode='before')
+    @classmethod
+    def _coerce_pickup_datetimes(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
