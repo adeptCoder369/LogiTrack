@@ -353,6 +353,7 @@ async def login(data: UserLogin):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid mobile number or password")
     if not user.password_set:
+        full_mobile = normalize_mobile(data.mobile, data.country_code)
         otp_code = generate_otp()
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=OTP_EXPIRY_SECONDS)
         otp_doc = sql_models.OTP(
@@ -404,6 +405,7 @@ async def first_time_setup(data: FirstTimeSetupRequest):
         raise HTTPException(status_code=404, detail="User not found")
     if user.password_set:
         raise HTTPException(status_code=400, detail="Password already set. Please use regular login.")
+    full_mobile = normalize_mobile(data.mobile, data.country_code)
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(sql_models.OTP).where(

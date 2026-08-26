@@ -37,6 +37,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { useState } from 'react';
+import { getFileUrl } from '../../lib/api';
 
 // Navigation items with their routes (permissions are now dynamic)
 const allNavItems = [
@@ -88,7 +89,10 @@ export const Sidebar = () => {
   // Tenant branding (Phase 0); falls back to the legacy InfoEIGHT look.
   const branding = tenant?.branding || {};
   const brandName = branding.name || 'IBRMCO';
-  const brandLogo = branding.logo || 'https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png';
+  const rawLogo = branding.logo || '';
+  const brandLogo = rawLogo
+    ? (rawLogo.startsWith('http') || rawLogo.startsWith('data:') ? rawLogo : getFileUrl(rawLogo))
+    : 'https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png';
 
   const handleLogout = () => {
     logout();

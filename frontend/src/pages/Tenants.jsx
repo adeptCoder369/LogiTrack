@@ -12,8 +12,55 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { tenantApi } from '../lib/api';
+import { tenantApi, getFileUrl } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { FileUpload } from '../components/shared/FileUpload';
+
+// HSL <-> HEX helpers for color picker (theme expects HSL triplet like "222 47% 11%")
+function hslToHex(hsl) {
+  if (!hsl) return '#1e293b';
+  if (hsl.startsWith('#')) return hsl;
+  const parts = hsl.trim().split(/\s+/);
+  if (parts.length !== 3) return '#1e293b';
+  let h = parseFloat(parts[0]);
+  let s = parseFloat(parts[1].replace('%', '')) / 100;
+  let l = parseFloat(parts[2].replace('%', '')) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+  else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+  else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+  else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+  else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  r = Math.round((r + m) * 255); g = Math.round((g + m) * 255); b = Math.round((b + m) * 255);
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+function hexToHsl(hex) {
+  let r = 0, g = 0, b = 0;
+  if (hex.startsWith('#')) hex = hex.slice(1);
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  if (hex.length !== 6) return '222 47% 11%';
+  r = parseInt(hex.slice(0, 2), 16) / 255;
+  g = parseInt(hex.slice(2, 4), 16) / 255;
+  b = parseInt(hex.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+      case g: h = ((b - r) / d + 2); break;
+      case b: h = ((r - g) / d + 4); break;
+    }
+    h *= 60;
+  }
+  s = Math.round(s * 100); l = Math.round(l * 100); h = Math.round(h);
+  return `${h} ${s}% ${l}%`;
+}
 
 const STATUS_STYLES = {
   active: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -37,7 +84,10 @@ export default function TenantsPage() {
     brandingLogo: "",
     brandingPrimary: "",
     brandingAccent: "",
-    featureFlags: ""
+    featureFlags: "",
+    ownerName: "",
+    ownerMobile: "",
+    ownerEmail: ""
   });
 
   const handleInputChange = (e) => {
@@ -62,27 +112,40 @@ export default function TenantsPage() {
     if (user?.is_master_admin) loadTenants();
   }, [user]);
 
-  const buildPayload = () => ({
-    name: formData.name,
-    slug: formData.slug,
-    subscription_plan: formData.subscription_plan || null,
-    branding: {
-      name: formData.brandingName,
-      logo: formData.brandingLogo,
-      primary: formData.brandingPrimary,
-      accent: formData.brandingAccent,
-    },
-    feature_flags: formData.featureFlags
-      ? Object.fromEntries(
-          formData.featureFlags.split(',').map(s => [s.trim(), true]).filter(([k]) => k)
-        )
-      : {},
-  });
+  const buildPayload = () => {
+    const base = {
+      name: formData.name,
+      slug: formData.slug,
+      subscription_plan: formData.subscription_plan || null,
+      branding: {
+        name: formData.brandingName,
+        logo: formData.brandingLogo,
+        primary: formData.brandingPrimary,
+        accent: formData.brandingAccent,
+      },
+      feature_flags: formData.featureFlags
+        ? Object.fromEntries(
+            formData.featureFlags.split(',').map(s => [s.trim(), true]).filter(([k]) => k)
+          )
+        : {},
+    };
+    // owner only on create — mirrors backend TenantCreate owner_* optional
+    if (!editingTenant) {
+      base.owner_name = formData.ownerName?.trim() || null;
+      base.owner_mobile = formData.ownerMobile?.trim() || null;
+      base.owner_email = formData.ownerEmail?.trim() || null;
+    }
+    return base;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.slug) {
       toast.error('Tenant name and slug are required');
+      return;
+    }
+    if (!editingTenant && (formData.ownerName || formData.ownerMobile) && !(formData.ownerName && formData.ownerMobile)) {
+      toast.error('Owner name and mobile are both required');
       return;
     }
     try {
@@ -93,10 +156,14 @@ export default function TenantsPage() {
       } else {
         const response = await tenantApi.create(buildPayload());
         setTenants(prev => [...prev, response.data]);
-        toast.success('Tenant created');
+        if (response.data?.owner) {
+          toast.success(`Tenant created — owner ${response.data.owner.name} (${response.data.owner.mobile}) can now login via OTP`);
+        } else {
+          toast.success('Tenant created');
+        }
       }
       setShowSidebar(false);
-      setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", featureFlags: "" });
+      setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", featureFlags: "", ownerName: "", ownerMobile: "", ownerEmail: "" });
       setEditingTenant(null);
     } catch (error) {
       console.error('Failed to save tenant', error);
@@ -117,6 +184,9 @@ export default function TenantsPage() {
       brandingPrimary: branding.primary || "",
       brandingAccent: branding.accent || "",
       featureFlags: Object.keys(tenant.feature_flags || {}).join(', '),
+      ownerName: "",
+      ownerMobile: "",
+      ownerEmail: ""
     });
     setShowSidebar(true);
   };
@@ -138,7 +208,11 @@ export default function TenantsPage() {
           <p className="text-xs text-slate-500">Multi-workspace management — branding, feature flags and subscription plans</p>
         </div>
         <button
-          onClick={() => { setEditingTenant(null); setShowSidebar(true); }}
+          onClick={() => {
+            setEditingTenant(null);
+            setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", featureFlags: "", ownerName: "", ownerMobile: "", ownerEmail: "" });
+            setShowSidebar(true);
+          }}
           className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all duration-200 self-start md:self-auto"
         >
           <Plus className="w-4 h-4" /> Add Tenant
@@ -241,8 +315,16 @@ export default function TenantsPage() {
                     <td className="py-3.5 px-4 font-mono text-center text-slate-400 font-medium">{index + 1}</td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                          {(tenant.branding?.name || tenant.name).charAt(0).toUpperCase()}
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden border border-slate-200">
+                          {tenant.branding?.logo ? (
+                            <img
+                              src={tenant.branding.logo.startsWith('http') ? tenant.branding.logo : getFileUrl(tenant.branding.logo)}
+                              alt={tenant.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }}
+                            />
+                          ) : null}
+                          <span style={{ display: tenant.branding?.logo ? 'none' : 'flex' }}>{(tenant.branding?.name || tenant.name).charAt(0).toUpperCase()}</span>
                         </div>
                         <span className="font-semibold text-slate-900">{tenant.name}</span>
                       </div>
@@ -383,38 +465,59 @@ export default function TenantsPage() {
                     />
                   </div>
                   <div className="mt-3">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Logo URL</label>
-                    <input
-                      type="text"
-                      name="brandingLogo"
-                      placeholder="https://..."
+                    <FileUpload
                       value={formData.brandingLogo}
-                      onChange={handleInputChange}
-                      className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      onChange={(val) => setFormData(prev => ({ ...prev, brandingLogo: val || "" }))}
+                      label="Logo (image upload)"
+                      accept="image/*"
+                      showCameraOption={false}
                     />
+                    {formData.brandingLogo && !formData.brandingLogo.startsWith('http') && (
+                      <p className="text-[10px] text-slate-400 mt-1">Stored as file_id. Preview via secure download URL.</p>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Primary (HSL)</label>
-                      <input
-                        type="text"
-                        name="brandingPrimary"
-                        placeholder="222 47% 11%"
-                        value={formData.brandingPrimary}
-                        onChange={handleInputChange}
-                        className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                      />
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Primary</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={hslToHex(formData.brandingPrimary)}
+                          onChange={(e) => setFormData(prev => ({ ...prev, brandingPrimary: hexToHsl(e.target.value) }))}
+                          className="w-10 h-9 p-1 border rounded cursor-pointer bg-white"
+                          title="Pick primary color"
+                        />
+                        <input
+                          type="text"
+                          name="brandingPrimary"
+                          placeholder="222 47% 11%"
+                          value={formData.brandingPrimary}
+                          onChange={handleInputChange}
+                          className="flex-1 text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">HSL triplet, picker auto-converts.</p>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Accent (HSL)</label>
-                      <input
-                        type="text"
-                        name="brandingAccent"
-                        placeholder="24 95% 53%"
-                        value={formData.brandingAccent}
-                        onChange={handleInputChange}
-                        className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                      />
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Accent</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={hslToHex(formData.brandingAccent)}
+                          onChange={(e) => setFormData(prev => ({ ...prev, brandingAccent: hexToHsl(e.target.value) }))}
+                          className="w-10 h-9 p-1 border rounded cursor-pointer bg-white"
+                          title="Pick accent color"
+                        />
+                        <input
+                          type="text"
+                          name="brandingAccent"
+                          placeholder="24 95% 53%"
+                          value={formData.brandingAccent}
+                          onChange={handleInputChange}
+                          className="flex-1 text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">HSL triplet, picker auto-converts.</p>
                     </div>
                   </div>
                 </div>
@@ -431,6 +534,46 @@ export default function TenantsPage() {
                   />
                   <p className="text-[10px] text-slate-400 mt-1">Comma-separated keys, each enabled. Leave empty for none.</p>
                 </div>
+
+                {!editingTenant && (
+                  <div className="border-t pt-4 bg-amber-50/50 -mx-6 px-6 py-4 rounded">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1">Owner Login — OTP first-time setup (A)</p>
+                    <p className="text-[10px] text-slate-500 mb-3">Master creates the tenant owner Management login. Owner will receive OTP on first login to set own password. Leave blank to create tenant without owner.</p>
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Owner Name</label>
+                      <input
+                        type="text"
+                        name="ownerName"
+                        placeholder="e.g. Priya Patel"
+                        value={formData.ownerName}
+                        onChange={handleInputChange}
+                        className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Owner Mobile (10 digits)</label>
+                      <input
+                        type="text"
+                        name="ownerMobile"
+                        placeholder="e.g. 9876543210"
+                        value={formData.ownerMobile}
+                        onChange={handleInputChange}
+                        className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Owner Email (optional)</label>
+                      <input
+                        type="email"
+                        name="ownerEmail"
+                        placeholder="owner@acme.test"
+                        value={formData.ownerEmail}
+                        onChange={handleInputChange}
+                        className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Actions Footer */}
