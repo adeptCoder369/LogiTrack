@@ -706,15 +706,24 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
 
 @api_router.get("/uploads/{file_id}")
 async def get_file(file_id: str, current_user: dict = Depends(get_download_user)):
-    # Tenant-isolated storage with a legacy-root fallback so files uploaded
-    # before Phase 0 keep working without any file moves.
+    # Tenant-isolated storage with platform + legacy fallbacks.
+    # Branding logos are uploaded by master (platform tenant) but must be
+    # readable by the target tenant, so we check platform folder as fallback.
     candidate = None
     if current_user:
-        candidate = UPLOAD_DIR / (current_user.get("tenant_id") or PLATFORM_TENANT_ID) / file_id
-        if not candidate.exists():
-            candidate = None
+        p = UPLOAD_DIR / (current_user.get("tenant_id") or PLATFORM_TENANT_ID) / file_id
+        if p.exists():
+            candidate = p
+        else:
+            p2 = UPLOAD_DIR / PLATFORM_TENANT_ID / file_id
+            if p2.exists():
+                candidate = p2
     if candidate is None:
-        candidate = UPLOAD_DIR / file_id
+        p3 = UPLOAD_DIR / file_id
+        if p3.exists():
+            candidate = p3
+        else:
+            candidate = UPLOAD_DIR / file_id
     file_path = candidate
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")

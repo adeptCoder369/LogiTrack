@@ -276,9 +276,8 @@ async def revoke_product_access_from_users(
 async def get_my_product_access(current_user: dict = Depends(get_current_user)):
     """Get current user's product access"""
     assigned_product_ids = await get_user_product_ids(current_user)
-    is_master_admin = current_user.get("is_master_admin", False)
 
-    if is_master_admin:
+    if assigned_product_ids is None:
         all_products = await db.products.find({}, {"_id": 0}).to_list(1000)
         return {
             "has_all_access": True,

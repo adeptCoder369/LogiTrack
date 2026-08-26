@@ -36,7 +36,7 @@ import {
   ArrowRightLeft,
   CreditCard
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getFileUrl } from '../../lib/api';
 
 // Navigation items with their routes (permissions are now dynamic)
@@ -82,17 +82,21 @@ const allNavItems = [
 
 export const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const { user, logout, tenant } = useAuth();
   const { hasRoutePermission, loading, myDepots, myProducts } = usePermissions();
   const navigate = useNavigate();
 
-  // Tenant branding (Phase 0); falls back to the legacy InfoEIGHT look.
+  // Tenant branding (Phase 0); falls back to icon when no custom logo.
   const branding = tenant?.branding || {};
   const brandName = branding.name || 'IBRMCO';
   const rawLogo = branding.logo || '';
-  const brandLogo = rawLogo
+  const hasCustomLogo = !!rawLogo;
+  const brandLogo = hasCustomLogo
     ? (rawLogo.startsWith('http') || rawLogo.startsWith('data:') ? rawLogo : getFileUrl(rawLogo))
-    : 'https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png';
+    : null;
+
+  useEffect(() => setLogoError(false), [rawLogo]);
 
   const handleLogout = () => {
     logout();
@@ -131,9 +135,13 @@ export const Sidebar = () => {
       {/* Mobile Menu Trigger Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 z-50 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20">
-            <Truck className="w-4 h-4 text-white" />
-          </div>
+          {hasCustomLogo && !logoError ? (
+            <img src={brandLogo} alt={brandName} className="h-8 max-w-[120px] object-contain bg-white rounded-lg p-1" onError={() => setLogoError(true)} />
+          ) : (
+            <div className="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center shadow-lg">
+              <Truck className="w-4 h-4 text-white" />
+            </div>
+          )}
           <span className="text-sm font-bold text-white tracking-tight font-sans">
             {brandName}
           </span>
@@ -168,21 +176,30 @@ export const Sidebar = () => {
           max-lg:top-16 max-lg:h-[calc(100vh-4rem)]
         `}
       >
-        {/* UPPER SECTION: Logo Header */}
-        <div className="hidden lg:flex flex-col items-center justify-center px-6 h-24 border-b border-slate-800/60 bg-slate-950/20">
-          <img
-            src={brandLogo}
-            alt={brandName}
-            className="h-7 mb-2 opacity-90 object-contain"
-          />
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center shadow-md shadow-orange-500/10">
-              <Truck className="w-3.5 h-3.5 text-white" />
+        {/* UPPER SECTION: Logo Header — pro: image if uploaded, else icon */}
+        <div className="hidden lg:flex flex-col items-center justify-center px-6 py-6 border-b border-slate-800/60 bg-slate-950/30 backdrop-blur-sm">
+          {hasCustomLogo && !logoError ? (
+            <>
+              <div className="bg-white rounded-xl p-2.5 shadow-lg border border-white/20 max-w-[180px] w-full flex items-center justify-center">
+                <img
+                  src={brandLogo}
+                  alt={brandName}
+                  className="max-h-10 max-w-full object-contain"
+                  onError={() => setLogoError(true)}
+                />
+              </div>
+              <p className="text-[10px] tracking-[0.22em] text-slate-400 uppercase mt-3 font-semibold">{brandName}</p>
+            </>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center shadow-lg shadow-black/20">
+                <Truck className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-[15px] font-bold text-white tracking-widest uppercase font-sans">
+                {brandName}
+              </h1>
             </div>
-            <h1 className="text-sm font-bold text-white tracking-wide uppercase font-sans">
-              {brandName}
-            </h1>
-          </div>
+          )}
         </div>
 
         {/* PROFILE SECTION: User Details & Dynamic Meta Pills */}
@@ -192,7 +209,7 @@ export const Sidebar = () => {
               <p className="text-sm font-semibold text-slate-100 truncate">{user.name}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <p className="text-xs font-medium text-orange-400 tracking-medium uppercase">{user.role}</p>
+                <p className="text-xs font-medium text-accent-brand tracking-medium uppercase">{user.role}</p>
               </div>
             </div>
 
@@ -283,7 +300,7 @@ export const Sidebar = () => {
                       <>
                         {/* Active status indicator pill */}
                         {isActive && (
-                          <div className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-gradient-to-b from-orange-500 to-amber-500 rounded-r-md" />
+                          <div className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-accent-brand rounded-r-md" />
                         )}
                         <item.icon
                           size={18}

@@ -43,8 +43,8 @@ class TenantUpdate(BaseModel):
     feature_flags: Optional[dict] = None
 
 
-def _to_dict(tenant) -> dict:
-    return {
+def _to_dict(tenant, owner=None) -> dict:
+    d = {
         "id": tenant.id,
         "name": tenant.name,
         "slug": tenant.slug,
@@ -54,6 +54,16 @@ def _to_dict(tenant) -> dict:
         "feature_flags": tenant.feature_flags or {},
         "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
     }
+    if owner:
+        d["owner"] = {
+            "id": owner.id,
+            "name": owner.name,
+            "mobile": owner.mobile,
+            "email": owner.email,
+            "role": owner.role,
+            "password_set": owner.password_set,
+        }
+    return d
 
 
 @router.get("/tenant/config")
@@ -68,7 +78,27 @@ async def list_tenants(current_user: dict = Depends(get_current_user)):
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(sql_models.Tenant).order_by(sql_models.Tenant.created_at))
         tenants = result.scalars().all()
-    return [_to_dict(t) for t in tenants]
+        out = []
+        for t in tenants:
+            # owner = first Management user in tenant (or master for platform)
+            owner = None
+            if t.id == "11111111-1111-1111-1111-111111111111":
+                owner = (await session.execute(
+                    select(sql_models.User).where(sql_models.User.is_master_admin == True).limit(1)
+                )).scalar_one_or_none()
+            else:
+                owner = (await session.execute(
+                    select(sql_models.User).where(
+                        sql_models.User.tenant_id == t.id,
+                        sql_models.User.role == "Management",
+                    ).order_by(sql_models.User.created_at).limit(1)
+                )).scalar_one_or_none()
+                if not owner:
+                    owner = (await session.execute(
+                        select(sql_models.User).where(sql_models.User.tenant_id == t.id).order_by(sql_models.User.created_at).limit(1)
+                    )).scalar_one_or_none()
+            out.append(_to_dict(t, owner))
+        return out
 
 
 @router.post("/tenants")
@@ -180,4 +210,12 @@ async def update_tenant(tenant_id: str, data: TenantUpdate, current_user: dict =
         )
         await session.commit()
         await session.refresh(tenant)
-    return _to_dict(tenant)
+        # fetch owner for response
+        owner = None
+        if tenant.id == "11111111-1111-1111-1111-111111111111":
+            owner = (await session.execute(select(sql_models.User).where(sql_models.User.is_master_admin == True).limit(1))).scalar_one_or_none()
+        else:
+            owner = (await session.execute(select(sql_models.User).where(sql_models.User.tenant_id == tenant.id, sql_models.User.role == "Management").order_by(sql_models.User.created_at).limit(1))).scalar_one_or_none()
+            if not owner:
+                owner = (await session.execute(select(sql_models.User).where(sql_models.User.tenant_id == tenant.id).order_by(sql_models.User.created_at).limit(1))).scalar_one_or_none()
+    return _to_dict(tenant, owner)

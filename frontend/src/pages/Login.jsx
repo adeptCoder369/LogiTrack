@@ -335,11 +335,7 @@ export default function Login() {
 
   const renderHeader = () => (
     <div className="text-center mb-8">
-      <img
-        src="https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png"
-        alt="InfoEIGHT"
-        className="h-16 mx-auto mb-4"
-      />
+     
       <img
         src='icons/icon-512.webp'
         alt='IBRMCO Logo'
@@ -434,13 +430,13 @@ export default function Login() {
       <div className="flex justify-between items-center text-sm">
         {otpTimer > 0 ? (
           <span className="text-slate-500">
-            Resend in <span className="text-orange-500 font-medium">{formatTime(otpTimer)}</span>
+            Resend in <span className="text-accent-brand font-medium">{formatTime(otpTimer)}</span>
           </span>
         ) : (
           <button
             type="button"
             onClick={() => handleResendOtp(purpose)}
-            className="text-orange-500 hover:text-orange-400 flex items-center"
+            className="text-accent-brand hover:text-accent-brand/80 flex items-center"
             disabled={loading}
           >
             <RefreshCw className="w-3 h-3 mr-1" />
@@ -482,7 +478,7 @@ export default function Login() {
           </div>
           <Button
             type="submit"
-            className="w-full bg-slate-900 hover:bg-slate-800"
+            className="w-full bg-brand hover:bg-brand/90 text-primary-foreground"
             disabled={loading}
             data-testid="login-submit"
           >
@@ -494,7 +490,7 @@ export default function Login() {
           <button
             type="button"
             onClick={() => setActiveView('loginOtp')}
-            className="w-full text-sm text-orange-600 hover:text-orange-500 flex items-center justify-center"
+            className="w-full text-sm text-accent-brand hover:text-accent-brand/80 flex items-center justify-center"
           >
             <KeyRound className="w-4 h-4 mr-2" />
             Login with OTP
@@ -537,7 +533,7 @@ export default function Login() {
             {renderTenantInput(otpLoginData, setOtpLoginData, 'otpLogin-')}
             <Button
               onClick={handleRequestLoginOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="request-login-otp"
             >
@@ -549,7 +545,7 @@ export default function Login() {
             {renderOtpInput(otpLoginData.otp, (val) => setOtpLoginData(prev => ({ ...prev, otp: val })), 'login')}
             <Button
               onClick={handleVerifyLoginOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="verify-login-otp"
             >
@@ -580,7 +576,7 @@ export default function Login() {
             {renderTenantInput(forgotData, setForgotData, 'forgot-')}
             <Button
               onClick={handleForgotPasswordSendOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="forgot-send-otp"
             >
@@ -594,7 +590,7 @@ export default function Login() {
             {renderOtpInput(forgotData.otp, (val) => setForgotData(prev => ({ ...prev, otp: val })), 'reset_password')}
             <Button
               onClick={handleForgotPasswordVerifyOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="forgot-verify-otp"
             >
@@ -637,7 +633,7 @@ export default function Login() {
             </div>
             <Button
               onClick={handleResetPassword}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="reset-password-submit"
             >
@@ -696,7 +692,7 @@ export default function Login() {
 
         <Button
           onClick={handleFirstTimeSetup}
-          className="w-full bg-orange-500 hover:bg-orange-600"
+          className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
           disabled={loading}
           data-testid="first-time-setup-submit"
         >

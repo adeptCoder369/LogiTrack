@@ -216,9 +216,8 @@ async def revoke_depot_access_from_users(depot_id: str, data: BulkDepotAccessReq
 @router.get("/depot-access/my-depots")
 async def get_my_depot_access(current_user: dict = Depends(get_current_user)):
     assigned_depot_ids = await get_user_depot_ids(current_user)
-    is_master_admin = current_user.get("is_master_admin", False)
 
-    if is_master_admin:
+    if assigned_depot_ids is None:
         all_depots = await db.depots.find({}, {"_id": 0}).to_list(1000)
         return {"has_all_access": True, "assigned_depots": all_depots, "assigned_depot_ids": [d["id"] for d in all_depots]}
 
