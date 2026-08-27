@@ -121,6 +121,60 @@ async def wipe_tenant(tenant_id):
         for n in ["1","2","3"]:
             stale_ids.add(did(slug,"rs",n))
             stale_ids.add(did(slug,"rz",n))
+        # inventory
+        for n in ["d1-p1","d1-p2","d2-p3","c1-p1"]:
+            stale_ids.add(did(slug,"inv",n))
+        # invoices / payments / notes
+        for n in ["1","2","3"]:
+            stale_ids.add(did(slug,"invoice",n))
+            stale_ids.add(did(slug,"invitem",n))
+        for n in ["1","2"]:
+            stale_ids.add(did(slug,"pay",n))
+            stale_ids.add(did(slug,"invpay",n))
+        stale_ids.add(did(slug,"cn","1"))
+        stale_ids.add(did(slug,"dn","1"))
+        # orders
+        for n in ["1","2","3"]:
+            stale_ids.add(did(slug,"do",n))
+            stale_ids.add(did(slug,"po",n))
+        for n in ["1","2","3","4","5","6"]:
+            stale_ids.add(did(slug,"lifting",n))
+        for n in ["1","2","3","4","5","6","7","8"]:
+            stale_ids.add(did(slug,"pickup",n))
+        for n in ["1","2","3"]:
+            stale_ids.add(did(slug,"vt",n))
+        for n in ["1","2","3","4","5"]:
+            stale_ids.add(did(slug,"lead",n))
+        for n in ["1","2"]:
+            stale_ids.add(did(slug,"firm",n))
+            stale_ids.add(did(slug,"firm_off",n))
+            stale_ids.add(did(slug,"fa",n))
+            stale_ids.add(did(slug,"am",n))
+        stale_ids.add(did(slug,"firm_fac","1"))
+        for n in ["ops","sales","accounts"]:
+            stale_ids.add(did(slug,"dept",n))
+        for n in ["manager","executive","weigher","accountant"]:
+            stale_ids.add(did(slug,"desig",n))
+        for n in ["1","2","3","4","5","6"]:
+            stale_ids.add(did(slug,"emp",n))
+        for n in ["c1-ho","c1-br"]:
+            stale_ids.add(did(slug,"office",n))
+        stale_ids.add(did(slug,"factory","c1-p1"))
+        for n in ["1","2","3"]:
+            stale_ids.add(did(slug,"sp",n))
+        stale_ids.add(did(slug,"sp","d1-p1"))
+        stale_ids.add(did(slug,"sp","d1-p2"))
+        stale_ids.add(did(slug,"sp","d2-p3"))
+        stale_ids.add(did(slug,"sp","c1-p1"))
+        stale_ids.add(did(slug,"ov","c1-p1"))
+        for n in ["c1-p1","c1-p2","c2-p1"]:
+            stale_ids.add(did(slug,"pricing",n))
+        for n in ["1","2","3","4"]:
+            stale_ids.add(did(slug,"tr","transfer",n))
+            for ev in ["Requested","Approved","Dispatched","Received"]:
+                stale_ids.add(did(slug,"audit",n,ev))
+        stale_ids.add(did(slug,"sub","1"))
+        stale_ids.add(did(slug,"be","1"))
         stale_ids.discard("")
 
     for model in TENANT_TABLES:
@@ -355,17 +409,17 @@ async def seed_one_tenant(t, password):
         await s.commit()
         print(f"  firms: 2 + offices 2 + factories 1 + firm_access 2 (Weightment)")
 
-        # delivery_orders (3)
-        do1 = m.DeliveryOrder(id=did(slug,"do","1"), tenant_id=tid, from_company_id=c_source.id, from_company_name=c_source.name, product_id=p1.id, product_name=p1.product_name, product_code=p1.product_code, total_quantity_mt=300, destination_type="Depot", to_depot_id=d1.id, to_depot_name=d1.name, do_order_no=f"DO-{slug.upper()}-000001", do_date=now(), lifted_quantity_mt=75, remaining_quantity_mt=225, status="In Progress", added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now())
-        do2 = m.DeliveryOrder(id=did(slug,"do","2"), tenant_id=tid, from_company_id=c_source.id, from_company_name=c_source.name, product_id=p2.id, product_name=p2.product_name, total_quantity_mt=150, destination_type="Company", to_company_id=c_child1.id, to_company_name=c_child1.name, do_order_no=f"DO-{slug.upper()}-000002", do_date=now(), lifted_quantity_mt=0, remaining_quantity_mt=150, status="Open", added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now())
+        # delivery_orders (3) — staggered 30d for monthly trend visible
+        do1 = m.DeliveryOrder(id=did(slug,"do","1"), tenant_id=tid, from_company_id=c_source.id, from_company_name=c_source.name, product_id=p1.id, product_name=p1.product_name, product_code=p1.product_code, total_quantity_mt=300, destination_type="Depot", to_depot_id=d1.id, to_depot_name=d1.name, do_order_no=f"DO-{slug.upper()}-000001", do_date=now()-timedelta(days=60), lifted_quantity_mt=75, remaining_quantity_mt=225, status="In Progress", added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now()-timedelta(days=60))
+        do2 = m.DeliveryOrder(id=did(slug,"do","2"), tenant_id=tid, from_company_id=c_source.id, from_company_name=c_source.name, product_id=p2.id, product_name=p2.product_name, total_quantity_mt=150, destination_type="Company", to_company_id=c_child1.id, to_company_name=c_child1.name, do_order_no=f"DO-{slug.upper()}-000002", do_date=now()-timedelta(days=30), lifted_quantity_mt=0, remaining_quantity_mt=150, status="Open", added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now()-timedelta(days=30))
         do3 = m.DeliveryOrder(id=did(slug,"do","3"), tenant_id=tid, from_company_id=c_source.id, from_company_name=c_source.name, product_id=p1.id, product_name=p1.product_name, total_quantity_mt=200, destination_type="Depot", to_depot_id=d2.id, to_depot_name=d2.name, loading_siding_id=rs1.id if 'rs1' in locals() else None, loading_siding_name=rs1.siding_name if 'rs1' in locals() else None, destination_siding_id=rs2.id if 'rs2' in locals() else None, destination_siding_name=rs2.siding_name if 'rs2' in locals() else None, do_order_no=f"DO-{slug.upper()}-000003", do_date=now(), lifted_quantity_mt=0, remaining_quantity_mt=200, status="Open", added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now())
         s.add_all([do1,do2,do3])
         await s.commit()
-        print(f"  delivery_orders: 3")
+        print(f"  delivery_orders: 3 (staggered 60/30/0d)")
 
-        # purchase_orders (3: Open, In Progress, Completed)
-        po1 = m.PurchaseOrder(id=did(slug,"po","1"), tenant_id=tid, source_id=d1.id, source_name=d1.name, source_type="Depot", depot_id=d1.id, depot_name=d1.name, to_company_id=c_child1.id, to_company_name=c_child1.name, billing_company_id=c_parent.id, billing_company_name=c_parent.name, product_id=p1.id, product_name=p1.product_name, product_code=p1.product_code, total_quantity_mt=200, dispatched_quantity_mt=0, remaining_quantity_mt=200, status="Open", po_number=f"PO-{slug.upper()}-000001", po_date=now(), added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now())
-        po2 = m.PurchaseOrder(id=did(slug,"po","2"), tenant_id=tid, source_id=d1.id, source_name=d1.name, source_type="Depot", depot_id=d1.id, depot_name=d1.name, to_company_id=c_child1.id, to_company_name=c_child1.name, billing_company_id=c_child1.id, billing_company_name=c_child1.name, product_id=p2.id, product_name=p2.product_name, product_code=p2.product_code, total_quantity_mt=150, dispatched_quantity_mt=40, remaining_quantity_mt=110, status="In Progress", po_number=f"PO-{slug.upper()}-000002", po_date=now(), added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now())
+        # purchase_orders (3: Open, In Progress, Completed) — staggered
+        po1 = m.PurchaseOrder(id=did(slug,"po","1"), tenant_id=tid, source_id=d1.id, source_name=d1.name, source_type="Depot", depot_id=d1.id, depot_name=d1.name, to_company_id=c_child1.id, to_company_name=c_child1.name, billing_company_id=c_parent.id, billing_company_name=c_parent.name, product_id=p1.id, product_name=p1.product_name, product_code=p1.product_code, total_quantity_mt=200, dispatched_quantity_mt=0, remaining_quantity_mt=200, status="Open", po_number=f"PO-{slug.upper()}-000001", po_date=now()-timedelta(days=60), added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now()-timedelta(days=60))
+        po2 = m.PurchaseOrder(id=did(slug,"po","2"), tenant_id=tid, source_id=d1.id, source_name=d1.name, source_type="Depot", depot_id=d1.id, depot_name=d1.name, to_company_id=c_child1.id, to_company_name=c_child1.name, billing_company_id=c_child1.id, billing_company_name=c_child1.name, product_id=p2.id, product_name=p2.product_name, product_code=p2.product_code, total_quantity_mt=150, dispatched_quantity_mt=40, remaining_quantity_mt=110, status="In Progress", po_number=f"PO-{slug.upper()}-000002", po_date=now()-timedelta(days=30), added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now()-timedelta(days=30))
         po3 = m.PurchaseOrder(id=did(slug,"po","3"), tenant_id=tid, source_id=d2.id, source_name=d2.name, source_type="Depot", depot_id=d2.id, depot_name=d2.name, to_company_id=c_child2.id, to_company_name=c_child2.name, billing_company_id=c_child2.id, billing_company_name=c_child2.name, product_id=p1.id, product_name=p1.product_name, product_code=p1.product_code, total_quantity_mt=80, dispatched_quantity_mt=80, remaining_quantity_mt=0, status="Completed", po_number=f"PO-{slug.upper()}-000003", po_date=now(), added_by=users["Management"].id, added_by_name=users["Management"].name, created_at=now())
         s.add_all([po1,po2,po3])
         await s.commit()
@@ -403,31 +457,36 @@ async def seed_one_tenant(t, password):
         await s.commit()
         print(f"  verified_trucks: 3")
 
-        # invoices (3: Draft/Issued/Paid) + items
+        # invoices (3: Draft/Issued/Paid) — A: INV1->PO1 Open, INV2->PO2 InProgress, INV3->PO3 Completed (real flow)
         for i, (st, total) in enumerate([("Draft", 10400),("Issued", 23600),("Paid", 23600)], start=1):
+            po = po1 if i==1 else po2 if i==2 else po3
+            client = c_child1 if i in (1,2) else c_child2
+            billing = c_child1 if i in (1,2) else c_child2
+            # billing for Paid was c_parent before; now use same as client for Completed PO3 to keep realistic
+            source = d1 if i in (1,2) else d2
             inv_id = did(slug,"invoice",str(i))
-            s.add(m.Invoice(id=inv_id, tenant_id=tid, invoice_no=f"INV-{slug.upper()}-{i:06d}", po_id=po1.id if i==1 else po2.id, po_number=po1.po_number if i==1 else po2.po_number, client_company_id=c_child1.id, client_company_name=c_child1.name, billing_company_id=c_parent.id if i==3 else c_child1.id, billing_company_name=c_parent.name if i==3 else c_child1.name, source_type="Depot", source_id=d1.id, source_name=d1.name, status=st, invoice_date=now().strftime("%Y-%m-%d"), due_date=(now()+timedelta(days=30)).strftime("%Y-%m-%d"), subtotal=20000 if i>1 else 10000, gst_rate=18, gst_amount=3600 if i>1 else 1800, total_amount=total, currency="INR", created_by=users["Management"].id, created_at=now()))
+            s.add(m.Invoice(id=inv_id, tenant_id=tid, invoice_no=f"INV-{slug.upper()}-{i:06d}", po_id=po.id, po_number=po.po_number, client_company_id=client.id, client_company_name=client.name, billing_company_id=billing.id, billing_company_name=billing.name, source_type="Depot", source_id=source.id, source_name=source.name, status=st, invoice_date=now().strftime("%Y-%m-%d"), due_date=(now()+timedelta(days=30)).strftime("%Y-%m-%d"), subtotal=20000 if i>1 else 10000, gst_rate=18, gst_amount=3600 if i>1 else 1800, total_amount=total, currency="INR", created_by=users["Management"].id, created_at=now()))
             s.add(m.InvoiceItem(id=did(slug,"invitem",str(i)), tenant_id=tid, invoice_id=inv_id, product_id=p1.id if i%2==1 else p2.id, product_name=p1.product_name if i%2==1 else p2.product_name, quantity_mt=40 if i==1 else 25, rate=500 if i==1 else 800, amount=20000 if i>1 else 10000, created_at=now()))
         await s.commit()
-        print(f"  invoices: 3")
+        print(f"  invoices: 3 (INV1->PO1 Open Draft, INV2->PO2 InProgress Issued, INV3->PO3 Completed Paid)")
 
-        # payments + allocations (for Paid invoice)
-        pay1 = m.Payment(id=did(slug,"pay","1"), tenant_id=tid, receipt_no=f"RCPT-{slug.upper()}-000001", company_id=c_child1.id, company_name=c_child1.name, amount=23600, mode="Bank Transfer", bank_ref="UTR123456", payment_date=now().strftime("%Y-%m-%d"), created_by=users["Management"].id, created_at=now())
+        # payments + allocations (for Paid invoice PO3 Completed)
+        pay1 = m.Payment(id=did(slug,"pay","1"), tenant_id=tid, receipt_no=f"RCPT-{slug.upper()}-000001", company_id=c_child2.id, company_name=c_child2.name, amount=23600, mode="Bank Transfer", bank_ref="UTR123456", payment_date=now().strftime("%Y-%m-%d"), created_by=users["Management"].id, created_at=now())
         pay2 = m.Payment(id=did(slug,"pay","2"), tenant_id=tid, receipt_no=f"RCPT-{slug.upper()}-000002", company_id=c_child1.id, company_name=c_child1.name, amount=5000, mode="UPI", bank_ref="UPI789", payment_date=now().strftime("%Y-%m-%d"), created_by=users["Management"].id, created_at=now())
         s.add_all([pay1,pay2])
         await s.commit()
-        # allocate pay1 fully to Paid invoice (3rd)
+        # allocate pay1 fully to Paid invoice (3rd, now PO3 Completed / c_child2)
         paid_inv_id = did(slug,"invoice","3")
         s.add(m.InvoicePayment(id=did(slug,"invpay","1"), tenant_id=tid, invoice_id=paid_inv_id, payment_id=pay1.id, amount_allocated=23600, created_at=now()))
-        # partial allocate to Issued invoice (2nd)
+        # partial allocate to Issued invoice (2nd, PO2)
         issued_inv_id = did(slug,"invoice","2")
         s.add(m.InvoicePayment(id=did(slug,"invpay","2"), tenant_id=tid, invoice_id=issued_inv_id, payment_id=pay2.id, amount_allocated=5000, created_at=now()))
         await s.commit()
-        # credit note reduces Issued outstanding
+        # credit note reduces Issued outstanding (INV2 -> c_child1)
         s.add(m.CreditNote(id=did(slug,"cn","1"), tenant_id=tid, note_no=f"CN-{slug.upper()}-000001", invoice_id=issued_inv_id, company_id=c_child1.id, company_name=c_child1.name, amount=1000, reason="Quality rebate", applied=True, created_by=users["Management"].id, created_at=now()))
         s.add(m.DebitNote(id=did(slug,"dn","1"), tenant_id=tid, note_no=f"DN-{slug.upper()}-000001", invoice_id=issued_inv_id, company_id=c_child1.id, company_name=c_child1.name, amount=500, reason="Handling surcharge", applied=True, created_by=users["Management"].id, created_at=now()))
         await s.commit()
-        print(f"  payments/notes: 2 payments + 2 allocations + 1 credit + 1 debit")
+        print(f"  payments/notes: 2 payments (c_child2 Paid, c_child1 Issued) + 2 allocations + 1 credit + 1 debit")
 
         # approval_matrices
         s.add(m.ApprovalMatrix(id=did(slug,"am","1"), tenant_id=tid, entity="stock_transfer", product_id=None, amount_threshold=100, approver_roles=["Management","Admin"], active=True, created_at=now()))

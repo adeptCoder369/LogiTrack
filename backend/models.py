@@ -75,6 +75,7 @@ class CompanyBase(BaseModel):
     name: str
     entity_roles: List[str] = []
     parent_client_id: Optional[str] = None
+    tenant_id: Optional[str] = None
 
     @field_validator('entity_roles', mode='before')
     @classmethod
@@ -250,6 +251,7 @@ class ProductBase(BaseModel):
     product_description: Optional[str] = None
     unit_of_measurement: Optional[str] = "MT"
     category: Optional[str] = None
+    tenant_id: Optional[str] = None
     hsn_code: Optional[str] = None
     assigned_roles: List[str] = []
 

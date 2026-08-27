@@ -138,6 +138,7 @@ class DbCompat:
         'usage_logs': sql_models.UsageLog,
         'subscriptions': sql_models.Subscription,
         'billing_events': sql_models.BillingEvent,
+        'tenants': sql_models.Tenant,
     }
 
     def __getattr__(self, name):

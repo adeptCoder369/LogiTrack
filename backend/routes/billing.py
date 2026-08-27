@@ -8,6 +8,9 @@ import json
 
 from .db_compat import db
 from auth_utils import get_current_user
+from database import AsyncSessionLocal
+from sqlalchemy import select, update
+import models_sqlalchemy as sql_models
 
 router = APIRouter(tags=["Billing"])
 
@@ -23,6 +26,46 @@ class SubscriptionPayload(BaseModel):
 def _require_platform(user: dict):
     if not user.get("is_master_admin"):
         raise HTTPException(status_code=403, detail="Platform admin only")
+
+
+async def _sync_tenant_from_billing(tenant_id: str, status: str):
+    """Blur+write-block sync: past_due -> feature_flags._billing_past_due, canceled -> suspended."""
+    # use SQLAlchemy for atomic tenant row patch (keeps branding/feature_flags intact)
+    async with AsyncSessionLocal() as session:
+        tenant = (await session.execute(select(sql_models.Tenant).where(sql_models.Tenant.id == tenant_id))).scalar_one_or_none()
+        if not tenant:
+            return
+        flags = dict(tenant.feature_flags or {})
+        patch = {}
+        if status == "canceled":
+            patch["status"] = "suspended"
+            if "_billing_past_due" in flags:
+                flags.pop("_billing_past_due", None)
+                patch["feature_flags"] = flags
+        elif status == "past_due":
+            # keep active but mark past_due for FeatureGate blur + write 402
+            flags["_billing_past_due"] = True
+            patch["feature_flags"] = flags
+            if tenant.status != "active":
+                patch["status"] = "active"
+        elif status in ("active", "trialing"):
+            changed = False
+            if "_billing_past_due" in flags:
+                flags.pop("_billing_past_due", None)
+                patch["feature_flags"] = flags
+                changed = True
+            if tenant.status == "suspended":
+                # only auto-unsuspend if it was billing-suspended; otherwise keep manual suspend
+                # we unsuspend on active for simplicity (master can re-suspend manually if needed)
+                patch["status"] = "active"
+                changed = True
+            if not changed and not patch:
+                return
+        else:
+            return
+        if patch:
+            await session.execute(update(sql_models.Tenant).where(sql_models.Tenant.id == tenant_id).values(**patch))
+            await session.commit()
 
 
 @router.get("/billing/subscriptions")
@@ -68,6 +111,7 @@ async def create_or_update_subscription(payload: SubscriptionPayload, current_us
         )
         # Keep tenants.subscription_plan in sync (denormalized cache)
         await db.tenants.update_one({"id": payload.tenant_id}, {"$set": {"subscription_plan": payload.plan}})
+        await _sync_tenant_from_billing(payload.tenant_id, payload.status)
         return await db.subscriptions.find_one({"tenant_id": payload.tenant_id}, {"_id": 0})
 
     sub = {
@@ -83,6 +127,7 @@ async def create_or_update_subscription(payload: SubscriptionPayload, current_us
     }
     await db.subscriptions.insert_one(sub)
     await db.tenants.update_one({"id": payload.tenant_id}, {"$set": {"subscription_plan": payload.plan}})
+    await _sync_tenant_from_billing(payload.tenant_id, payload.status)
     return sub
 
 
@@ -127,12 +172,21 @@ async def billing_webhook(provider: str, request: Request):
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
-    # Best-effort subscription status sync
+    # Best-effort subscription status sync + tenant hard/soft gate
     provider_sub_id = normalized.get("provider_subscription_id")
     status = normalized.get("status")
+    # try to resolve tenant_id from payload, normalized, or sub lookup
+    tenant_id_from_payload = payload.get("tenant_id") or normalized.get("tenant_id")
+    sub = None
     if provider_sub_id and status:
         sub = await db.subscriptions.find_one({"provider_subscription_id": provider_sub_id})
         if sub:
             await db.subscriptions.update_one({"id": sub["id"]}, {"$set": {"status": status}})
+            tenant_id_from_payload = tenant_id_from_payload or sub.get("tenant_id")
+    # if webhook carries tenant_id+status directly (manual test), sync tenant even without sub
+    if tenant_id_from_payload and status:
+        await _sync_tenant_from_billing(tenant_id_from_payload, status)
+    elif sub and status:
+        await _sync_tenant_from_billing(sub.get("tenant_id"), status)
 
     return {"received": True, "provider": provider, "event_type": normalized.get("event_type")}

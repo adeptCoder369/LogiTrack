@@ -1,5 +1,5 @@
 """Delivery Order routes"""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 
 from .db_compat import db
@@ -31,19 +31,30 @@ async def create_delivery_order(data: DeliveryOrderCreate, current_user: dict = 
     return order
 
 @router.get("/delivery-orders", response_model=List[DeliveryOrder])
-async def get_delivery_orders(status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    # Check permission for viewing delivery orders
-    await check_permission(current_user, "Delivery Orders (View)")
-    
-    # Apply product and depot filters
-    query = await build_product_filter(current_user, "product_id")
-    depot_filter = await build_depot_filter(current_user, "to_depot_id")
-    query.update(depot_filter)
-    
-    if status:
-        query["status"] = status
-    
-    return await db.delivery_orders.find(query, {"_id": 0}).to_list(1000)
+async def get_delivery_orders(status: Optional[str] = None, tenant_id: Optional[str] = Query(None), current_user: dict = Depends(get_current_user)):
+    # super per-tenant filter
+    _orig = None
+    if current_user.get("is_master_admin") and tenant_id:
+        from tenant import _tenant_var
+        _orig = _tenant_var.get()
+        _tenant_var.set(tenant_id)
+    try:
+        # Check permission for viewing delivery orders
+        await check_permission(current_user, "Delivery Orders (View)")
+        
+        # Apply product and depot filters
+        query = await build_product_filter(current_user, "product_id")
+        depot_filter = await build_depot_filter(current_user, "to_depot_id")
+        query.update(depot_filter)
+        
+        if status:
+            query["status"] = status
+        
+        return await db.delivery_orders.find(query, {"_id": 0}).to_list(1000)
+    finally:
+        if _orig is not None or (current_user.get("is_master_admin") and tenant_id):
+            from tenant import _tenant_var
+            _tenant_var.set(_orig)
 
 @router.get("/delivery-orders/{order_id}", response_model=DeliveryOrder)
 async def get_delivery_order(order_id: str, current_user: dict = Depends(get_current_user)):

@@ -103,8 +103,11 @@ export const AuthProvider = ({ children }) => {
     return roles.includes(normalizedRole);
   };
 
+  const isPastDue = !user?.is_master_admin && (tenant?.feature_flags?._billing_past_due === true);
+  const isSuspended = !user?.is_master_admin && ((tenant?.tenant?.status && tenant.tenant.status !== 'active') || tenant?.status === 'suspended');
+
   return (
-    <AuthContext.Provider value={{ user, tenant, loading, login, loginWithOtp, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, tenant, loading, login, loginWithOtp, logout, hasRole, isPastDue, isSuspended }}>
       {children}
     </AuthContext.Provider>
   );

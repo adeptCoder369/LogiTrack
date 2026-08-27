@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { analyticsApi, deliveryOrdersApi } from '../lib/api';
+import { analyticsApi, deliveryOrdersApi, tenantApi } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import {
   BarChart,
   Bar,
@@ -24,21 +25,32 @@ import {
 const COLORS = ['#0F172A', '#F97316', '#3B82F6', '#10B981', '#64748B', '#EAB308', '#EF4444'];
 
 export default function Analytics() {
+  const { user } = useAuth();
+  const isMaster = !!user?.is_master_admin;
   const [period, setPeriod] = useState('monthly');
   const [analytics, setAnalytics] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tenants, setTenants] = useState([]);
+  const [selectedTenant, setSelectedTenant] = useState('all');
+
+  useEffect(() => {
+    if (isMaster) {
+      tenantApi.getAll().then(res => setTenants(res.data || [])).catch(() => {});
+    }
+  }, [isMaster]);
 
   useEffect(() => {
     fetchData();
-  }, [period]);
+  }, [period, selectedTenant]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      const tenantId = isMaster && selectedTenant !== 'all' ? selectedTenant : undefined;
       const [analyticsRes, ordersRes] = await Promise.all([
-        analyticsApi.getDashboard(),
-        deliveryOrdersApi.getAll()
+        analyticsApi.getDashboard(tenantId),
+        deliveryOrdersApi.getAll(undefined, tenantId)
       ]);
       setAnalytics(analyticsRes.data);
       setOrders(ordersRes.data);
@@ -73,7 +85,7 @@ export default function Analytics() {
           grouped[key] = { name: key, orders: 0, quantity: 0 };
         }
         grouped[key].orders += 1;
-        grouped[key].quantity += order.quantity_mt || 0;
+        grouped[key].quantity += order.total_quantity_mt || order.quantity_mt || 0;
       }
     });
     return Object.values(grouped).slice(-12);
@@ -87,18 +99,30 @@ export default function Analytics() {
       if (!grouped[product]) {
         grouped[product] = { name: product, value: 0 };
       }
-      grouped[product].value += order.quantity_mt || 0;
+      grouped[product].value += order.total_quantity_mt || order.quantity_mt || 0;
     });
     return Object.values(grouped).filter(p => p.value > 0);
   };
 
-  // Status distribution
+  // Status distribution - backend: open/in_progress/completed, frontend labels Pending/In Transit/Delivered
   const getStatusDistribution = () => {
-    return [
-      { name: 'Pending', value: analytics?.orders_by_status.pending || 0 },
-      { name: 'In Transit', value: analytics?.orders_by_status.in_transit || 0 },
-      { name: 'Delivered', value: analytics?.orders_by_status.delivered || 0 },
+    const obs = analytics?.orders_by_status || {};
+    let vals = [
+      { name: 'Pending', value: obs.pending ?? obs.open ?? 0 },
+      { name: 'In Transit', value: obs.in_transit ?? obs.in_progress ?? 0 },
+      { name: 'Delivered', value: obs.delivered ?? obs.completed ?? 0 },
     ].filter(s => s.value > 0);
+    // fallback to counting orders directly if analytics returns 0 (company_id filter mismatch for Management)
+    if (vals.length === 0 && orders.length > 0) {
+      const counts = { Pending: 0, 'In Transit': 0, Delivered: 0 };
+      orders.forEach(o => {
+        if (o.status === 'Open') counts.Pending += 1;
+        else if (o.status === 'In Progress') counts['In Transit'] += 1;
+        else if (o.status === 'Completed' || o.status === 'Delivered') counts.Delivered += 1;
+      });
+      vals = Object.entries(counts).map(([name, value]) => ({ name, value })).filter(s => s.value > 0);
+    }
+    return vals;
   };
 
   const orderTrendData = getOrderTrendData();
@@ -120,17 +144,32 @@ export default function Analytics() {
       title="Analytics"
       subtitle="Detailed insights and reports"
       actions={
-        <Select value={period} onValueChange={setPeriod} data-testid="period-select">
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="weekly">Weekly</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-            <SelectItem value="quarterly">Quarterly</SelectItem>
-            <SelectItem value="yearly">Yearly</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3">
+          {isMaster && (
+            <Select value={selectedTenant} onValueChange={setSelectedTenant}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All workspaces" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All workspaces (collectively)</SelectItem>
+                {tenants.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.name} ({t.slug})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={period} onValueChange={setPeriod} data-testid="period-select">
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="yearly">Yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       }
     >
       {/* Summary Cards */}
@@ -147,7 +186,7 @@ export default function Analytics() {
           <CardContent className="pt-6">
             <p className="text-sm text-gray-500">Total Quantity</p>
             <p className="text-3xl font-bold text-slate-900" style={{ fontFamily: 'Manrope' }}>
-              {orders.reduce((sum, o) => sum + (o.quantity_mt || 0), 0).toFixed(2)} MT
+              {orders.reduce((sum, o) => sum + (o.total_quantity_mt || o.quantity_mt || 0), 0).toFixed(2)} MT
             </p>
           </CardContent>
         </Card>
@@ -155,7 +194,7 @@ export default function Analytics() {
           <CardContent className="pt-6">
             <p className="text-sm text-gray-500">Delivered</p>
             <p className="text-3xl font-bold text-green-600" style={{ fontFamily: 'Manrope' }}>
-              {orders.filter(o => o.status === 'Delivered').length}
+              {orders.filter(o => o.status === 'Completed' || o.status === 'Delivered').length}
             </p>
           </CardContent>
         </Card>
@@ -163,7 +202,7 @@ export default function Analytics() {
           <CardContent className="pt-6">
             <p className="text-sm text-gray-500">In Transit</p>
             <p className="text-3xl font-bold text-blue-600" style={{ fontFamily: 'Manrope' }}>
-              {orders.filter(o => o.status === 'In Transit').length}
+              {orders.filter(o => o.status === 'In Progress' || o.status === 'In Transit').length}
             </p>
           </CardContent>
         </Card>

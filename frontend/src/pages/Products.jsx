@@ -8,7 +8,8 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { productsApi, importApi, usersApi, companiesApi, productManagementApi } from '../lib/api';
+import { productsApi, importApi, usersApi, companiesApi, productManagementApi, tenantApi } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { toast } from 'sonner';
 import { Plus, Upload, Download, Save, Trash2, Building2, BadgeIndianRupee } from 'lucide-react';
 import { ProductsDataTable } from '@/components/products/DataTable';
@@ -381,8 +382,11 @@ function CatalogTab() {
 // ========================== OVERRIDES & PRICING TAB ==========================
 
 function OverridesAndPricingTab() {
+  const { user } = useAuth();
+  const isMaster = !!user?.is_master_admin;
   const [companies, setCompanies] = useState([]);
   const [products, setProducts] = useState([]);
+  const [tenants, setTenants] = useState([]);
   const [companyId, setCompanyId] = useState('');
   const [overrides, setOverrides] = useState({}); // product_id -> override
   const [pricing, setPricing] = useState({});     // product_id -> [rows]
@@ -390,6 +394,19 @@ function OverridesAndPricingTab() {
   const [priceForm, setPriceForm] = useState({}); // product_id -> {tier, rate, valid_from, valid_to}
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(null);
+  const selectedCompany = companies.find(c => c.id === companyId);
+  const displayProducts = isMaster && selectedCompany?.tenant_id ? products.filter(p => !p.tenant_id || p.tenant_id === selectedCompany.tenant_id) : products;
+  const tenantsById = tenants.reduce((m, t) => { m[t.id] = t; return m; }, {});
+  const getTenantLabel = (tenant) => {
+    if (!tenant) return '';
+    const name = (tenant.name || '').trim();
+    const slug = (tenant.slug || '').trim();
+    // show name if not too long, else slug, if no slug break name
+    if (name && name.length <= 18) return name;
+    if (slug) return slug;
+    // break long name: allow wrapping, return name as is (CSS will break)
+    return name;
+  };
 
   useEffect(() => {
     (async () => {
@@ -400,11 +417,17 @@ function OverridesAndPricingTab() {
         ]);
         setCompanies(companiesRes.data || []);
         setProducts(productsRes.data || []);
+        if (isMaster) {
+          try {
+            const tenantsRes = await tenantApi.getAll();
+            setTenants(tenantsRes.data || []);
+          } catch {}
+        }
       } catch {
         toast.error('Failed to load data');
       }
     })();
-  }, []);
+  }, [isMaster]);
 
   const seedForms = (products, overridesMap, pricingMap) => {
     const f = {};
@@ -425,6 +448,7 @@ function OverridesAndPricingTab() {
   };
 
   const loadForCompany = async (cid) => {
+    setCompanyId(cid);
     if (!cid) {
       setOverrides({});
       setPricing({});
@@ -444,7 +468,14 @@ function OverridesAndPricingTab() {
       });
       setOverrides(oMap);
       setPricing(pMap);
-      seedForms(products, oMap, pMap);
+      // B: for master, filter products to that company's tenant
+      const company = companies.find(c => c.id === cid);
+      if (company?.tenant_id) {
+        const filtered = products.filter(p => !p.tenant_id || p.tenant_id === company.tenant_id);
+        seedForms(filtered.length ? filtered : products, oMap, pMap);
+      } else {
+        seedForms(products, oMap, pMap);
+      }
     } catch {
       toast.error('Failed to load company settings');
     } finally {
@@ -525,11 +556,31 @@ function OverridesAndPricingTab() {
             <SelectValue placeholder="Select company" />
           </SelectTrigger>
           <SelectContent>
-            {companies.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-            ))}
+            {companies.length === 0 ? (
+              <div className="p-3 text-xs text-slate-500 text-center">No companies — seed demo or create a Client company first</div>
+            ) : (
+              companies.map((c) => {
+                const t = tenantsById[c.tenant_id];
+                const tenantLabel = isMaster ? getTenantLabel(t) : '';
+                return (
+                  <SelectItem key={c.id} value={c.id}>
+                    <span className="flex items-center gap-1.5 max-w-[260px]">
+                      {tenantLabel && (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono border flex-shrink-0">
+                          {tenantLabel}
+                        </span>
+                      )}
+                      <span className="truncate" style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>{c.name}</span>
+                    </span>
+                  </SelectItem>
+                );
+              })
+            )}
           </SelectContent>
         </Select>
+        {isMaster && (
+          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1 mt-2">Master view: all tenants (A) — picking a company filters products to that tenant (B)</p>
+        )}
       </div>
 
       {!companyId && (
@@ -543,7 +594,7 @@ function OverridesAndPricingTab() {
         <div className="space-y-4">
           {loading && <div className="text-center py-8 text-slate-400 animate-pulse">Loading company settings...</div>}
 
-          {!loading && products.map((product) => {
+          {!loading && displayProducts.map((product) => {
             const override = overrides[product.id];
             const pricingRows = pricing[product.id] || [];
             const f = form[product.id] || {};

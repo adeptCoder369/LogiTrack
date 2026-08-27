@@ -78,3 +78,17 @@ Starting Phase 5 (stock transfer engine).
 5. Stock Transfers UI + ledger export — request modal, status badges/locked display, detail + audit timeline with role-gated actions, Approval Rules tab (product/threshold/roles), Excel ledger download
 
 Starting Phase 6 (SaaS operations).
+
+
+
+------------ PHASE_6 — SaaS operations + PaaS readiness ------------
+
+1. Usage tracking — logs, middleware, summary + dashboard
+
+2. Billing hooks — subscriptions, Stripe/PayPal stubs, webhooks
+
+3. Extension registry — hook points, sample extension, docs
+
+4. API versioning — /api/v2 POC, deprecation headers, docs
+
+5. White-label — tenant resolver (header + subdomain), branding docs

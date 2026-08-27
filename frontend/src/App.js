@@ -7,6 +7,8 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { PermissionsProvider, usePermissions } from "./lib/permissions";
 import { ThemeProvider } from "./lib/theme";
+import { FeatureGate } from "./components/FeatureGate";
+import { BillingBanner } from "./components/BillingBanner";
 import { getOfflineQueueCount } from "./lib/offline";
 import { toast } from "sonner";
 
@@ -82,10 +84,29 @@ const ProtectedRoute = ({ children, permission, masterOnly }) => {
 
 // Layout with Sidebar
 const AppLayout = ({ children }) => {
+  const { isSuspended } = useAuth();
+  if (isSuspended) {
+    return (
+      <div className="main-layout">
+        <Sidebar />
+        <div className="content-area">
+          <BillingBanner />
+          <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-rose-200 p-8 text-center space-y-4">
+              <div className="w-12 h-12 mx-auto bg-rose-50 border border-rose-200 text-rose-600 rounded-full flex items-center justify-center">✕</div>
+              <h2 className="text-lg font-bold text-slate-900">Workspace suspended</h2>
+              <p className="text-sm text-slate-500">Your subscription was canceled and your workspace is suspended. Kindly contact Platform support to reactivate.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="main-layout">
       <Sidebar />
       <div className="content-area">
+        <BillingBanner />
         <div className="overflow-x-auto min-w-0 pt-4 lg:pt-0">
           {children}
         </div>
@@ -285,13 +306,13 @@ function AppRoutes() {
 
       <Route path="/leads" element={
         <ProtectedRoute permission="Leads (View)">
-          <AppLayout><Leads /></AppLayout>
+          <AppLayout><FeatureGate feature="leads"><Leads /></FeatureGate></AppLayout>
         </ProtectedRoute>
       } />
 
       <Route path="/firms" element={
         <ProtectedRoute permission="Firms (View)">
-          <AppLayout><Firms /></AppLayout>
+          <AppLayout><FeatureGate feature="firms"><Firms /></FeatureGate></AppLayout>
         </ProtectedRoute>
       } />
 
@@ -309,25 +330,25 @@ function AppRoutes() {
 
       <Route path="/invoices" element={
         <ProtectedRoute permission="Invoices (View)">
-          <AppLayout><Invoices /></AppLayout>
+          <AppLayout><FeatureGate feature="invoices"><Invoices /></FeatureGate></AppLayout>
         </ProtectedRoute>
       } />
 
       <Route path="/payments" element={
         <ProtectedRoute permission="Payments (View)">
-          <AppLayout><Payments /></AppLayout>
+          <AppLayout><FeatureGate feature="invoices"><Payments /></FeatureGate></AppLayout>
         </ProtectedRoute>
       } />
 
       <Route path="/notes" element={
         <ProtectedRoute permission="Credit Notes (View)">
-          <AppLayout><Notes /></AppLayout>
+          <AppLayout><FeatureGate feature="invoices"><Notes /></FeatureGate></AppLayout>
         </ProtectedRoute>
       } />
 
       <Route path="/stock-transfers" element={
         <ProtectedRoute permission="Stock Transfers (View)">
-          <AppLayout><StockTransfers /></AppLayout>
+          <AppLayout><FeatureGate feature="stock_transfers"><StockTransfers /></FeatureGate></AppLayout>
         </ProtectedRoute>
       } />
 

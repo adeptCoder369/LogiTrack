@@ -587,7 +587,7 @@ export default function Firms() {
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                         <p className="text-xs text-blue-800">
                           Grant a user access to this firm scoped to a specific <strong>product × depot</strong> pair.
-                          Enforcement of these grants lands with employee management (Phase 3).
+                          Enforcement of these grants lands with employee management.
                         </p>
                       </div>
                       <div className="space-y-4">

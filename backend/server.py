@@ -1431,7 +1431,15 @@ async def bulk_import(entity: str, file: UploadFile = File(...), current_user: d
 # ============ ANALYTICS ROUTES ============
 
 @api_router.get("/analytics/dashboard")
-async def get_dashboard_analytics(current_user: dict = Depends(get_current_user)):
+async def get_dashboard_analytics(current_user: dict = Depends(get_current_user), tenant_id: Optional[str] = Query(None)):
+    # super tenant per-tenant filter: if master and tenant_id provided, temporarily scope to that tenant
+    _orig_tenant = None
+    _tenant_scoped = False
+    if current_user.get("is_master_admin") and tenant_id:
+        from tenant import _tenant_var
+        _orig_tenant = _tenant_var.get()
+        _tenant_var.set(tenant_id)
+        _tenant_scoped = True
     companies_count = await db.companies.count_documents({})
     users_count = await db.users.count_documents({})
     transporters_count = await db.transporters.count_documents({})
@@ -1742,7 +1750,7 @@ async def get_dashboard_analytics(current_user: dict = Depends(get_current_user)
             "stock_by_depot": stock_by_depot_by_product.get(pid, [])
         })
 
-    return {
+    result = {
         "counts": {"companies": companies_count, "users": users_count, "transporters": transporters_count,
                    "trucks": trucks_count, "products": products_count, "depots": depots_count,
                    "delivery_orders": orders_count, "liftings": liftings_count},
@@ -1776,6 +1784,10 @@ async def get_dashboard_analytics(current_user: dict = Depends(get_current_user)
             "pending_count": len([l for l in company_deliveries if l.get("unloading_status") != "Verified"])
         }
     }
+    if _tenant_scoped:
+        from tenant import _tenant_var
+        _tenant_var.set(_orig_tenant)
+    return result
 
 
 # ============ ROUTE INCLUSION ============

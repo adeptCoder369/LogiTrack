@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { enqueueOfflineRequest, isMutation, isOnline } from './offline';
+import { toast } from 'sonner';
 // ================================================================================================================
 export const BACKEND_URL = (
   process.env.REACT_APP_BACKEND_URL
@@ -58,6 +59,12 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       localStorage.removeItem(DOWNLOAD_TOKEN_KEY);
       window.location.href = '/login';
+    }
+    if (error.response?.status === 402) {
+      toast.error(error.response?.data?.detail || 'Subscription past due — writes blocked');
+    }
+    if (error.response?.status === 403 && error.response?.data?.detail?.includes('suspended')) {
+      toast.error('Workspace suspended — contact Platform admin');
     }
     return Promise.reject(error);
   }
@@ -229,7 +236,7 @@ export const companyInventoryApi = {
 
 // Delivery Orders
 export const deliveryOrdersApi = {
-  getAll: (status) => api.get('/delivery-orders', { params: { status } }),
+  getAll: (status, tenantId) => api.get('/delivery-orders', { params: { status, tenant_id: tenantId || undefined } }),
   getOne: (id) => api.get(`/delivery-orders/${id}`),
   create: (data) => api.post('/delivery-orders', data),
   update: (id, data) => api.put(`/delivery-orders/${id}`, data),
@@ -466,7 +473,7 @@ export const notesApi = {
 
 // Analytics
 export const analyticsApi = {
-  getDashboard: () => api.get('/analytics/dashboard'),
+  getDashboard: (tenantId) => api.get('/analytics/dashboard', { params: tenantId ? { tenant_id: tenantId } : {} }),
 };
 
 // Reports

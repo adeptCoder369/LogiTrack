@@ -74,7 +74,7 @@ async def upsert_product_override(
     product = await db.products.find_one({"id": product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    await _resolve_company(data.company_id)
+    company = await _resolve_company(data.company_id)
 
     existing = await db.product_overrides.find_one({
         "company_id": data.company_id, "product_id": product_id,
@@ -94,6 +94,7 @@ async def upsert_product_override(
         override_id = str(uuid.uuid4())
         await db.product_overrides.insert_one({
             "id": override_id,
+            "tenant_id": company.get("tenant_id"),
             "company_id": data.company_id,
             "product_id": product_id,
             "created_at": now,
@@ -151,7 +152,7 @@ async def list_company_pricing(
 @router.post("/company-pricing")
 async def create_company_pricing(data: PricingPayload, current_user: dict = Depends(get_current_user)):
     _require_management(current_user)
-    await _resolve_company(data.company_id)
+    company = await _resolve_company(data.company_id)
     product = await db.products.find_one({"id": data.product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -160,6 +161,7 @@ async def create_company_pricing(data: PricingPayload, current_user: dict = Depe
     pricing_id = str(uuid.uuid4())
     await db.company_pricing.insert_one({
         "id": pricing_id,
+        "tenant_id": company.get("tenant_id"),
         "company_id": data.company_id,
         "product_id": data.product_id,
         "tier": data.tier,

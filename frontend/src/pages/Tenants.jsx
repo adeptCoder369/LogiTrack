@@ -11,7 +11,10 @@ import {
   Palette,
   Phone,
   Mail,
-  User
+  User,
+  ChevronDown,
+  Check,
+  X
 } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from 'sonner';
@@ -92,10 +95,17 @@ export default function TenantsPage() {
     ownerMobile: "",
     ownerEmail: ""
   });
+  const [flagDropdownOpen, setFlagDropdownOpen] = useState(false);
+  const KNOWN_FLAGS = ["invoices", "stock_transfers", "leads", "firms", "payments", "reports", "analytics"];
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  const toggleFlag = (flag) => {
+    const current = formData.featureFlags ? formData.featureFlags.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const next = current.includes(flag) ? current.filter(f => f !== flag) : [...current, flag];
+    setFormData(prev => ({ ...prev, featureFlags: next.join(', ') }));
   };
 
   const loadTenants = async () => {
@@ -561,15 +571,57 @@ export default function TenantsPage() {
 
                 <div className="border-t pt-4">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Feature Flags</label>
-                  <input
-                    type="text"
-                    name="featureFlags"
-                    placeholder="invoices, stock_transfers (comma separated)"
-                    value={formData.featureFlags}
-                    onChange={handleInputChange}
-                    className="w-full text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">Comma-separated keys, each enabled. Leave empty for none.</p>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setFlagDropdownOpen(!flagDropdownOpen)}
+                      className="w-full flex items-center justify-between text-xs p-2.5 border rounded bg-white hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[38px]"
+                    >
+                      <div className="flex flex-wrap gap-1.5 flex-1 text-left">
+                        {formData.featureFlags ? (
+                          formData.featureFlags.split(',').map(s => s.trim()).filter(Boolean).map(flag => (
+                            <span key={flag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[11px] font-medium">
+                              {flag}
+                              <span
+                                role="button"
+                                onClick={(e) => { e.stopPropagation(); toggleFlag(flag); }}
+                                className="ml-0.5 hover:bg-blue-100 rounded-full p-0.5"
+                              >
+                                <X className="w-3 h-3" />
+                              </span>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-400">Select features...</span>
+                        )}
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 ml-2 transition-transform ${flagDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {flagDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-48 overflow-auto">
+                        {KNOWN_FLAGS.map(flag => {
+                          const selected = formData.featureFlags.split(',').map(s => s.trim()).includes(flag);
+                          return (
+                            <label key={flag} className="flex items-center gap-2 px-3 py-2.5 hover:bg-slate-50 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleFlag(flag)}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className={`flex-1 ${selected ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>{flag}</span>
+                              {selected && <Check className="w-4 h-4 text-blue-600" />}
+                            </label>
+                          );
+                        })}
+                        <div className="border-t p-2 flex justify-between items-center bg-slate-50">
+                          <span className="text-[10px] text-slate-500">{formData.featureFlags ? formData.featureFlags.split(',').filter(Boolean).length : 0} selected</span>
+                          <button type="button" onClick={() => setFlagDropdownOpen(false)} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Done</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Pick from known modules — invoices, stock_transfers, leads, firms, etc.</p>
                 </div>
 
                 {!editingTenant && (

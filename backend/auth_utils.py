@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timezone
 from typing import List, Optional, Set
@@ -87,11 +87,19 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     payload = decode_token(credentials.credentials)
     user = await load_user_by_id(payload["user_id"])
     set_tenant_scope(user)
     await ensure_tenant_active(user)
+    # billing soft gate: block writes when past_due (master bypass, allowlist for billing/tenants/auth)
+    if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
+        path = request.url.path
+        if not any(path.startswith(p) for p in ("/api/v1/billing", "/api/v1/tenants", "/api/v1/tenant/config", "/api/v1/auth", "/api/v1/otp", "/api/v1/usage")):
+            from tenant import _tenant_flags_var
+            flags = _tenant_flags_var.get()
+            if flags and flags.get("_billing_past_due") and not user.get("is_master_admin"):
+                raise HTTPException(status_code=402, detail="Subscription past due — writes blocked. Kindly contact your admin to update payment.")
     return user
 
 
