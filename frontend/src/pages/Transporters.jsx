@@ -12,28 +12,13 @@ import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popove
 import { Checkbox } from '../components/ui/checkbox';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { transportersApi, importApi, companiesApi } from '../lib/api';
+import { transportersApi, importApi, companiesApi, trucksApi, pickupApi } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Upload, Download, Users, X, Edit, Trash2, User, Phone, Mail, MapPin, ChevronDown } from 'lucide-react';
+import { Plus, Upload, Download, Users, X, Edit, Trash2, User, Phone, Mail, MapPin, ChevronDown, ChevronUp, Truck, Package } from 'lucide-react';
 import { Can } from '../components/Can';
 import { usePermissions } from '../lib/permissions';
 
 const columns = [
-  {
-    key: 'name', label: 'Transporter Name', render: (v, row) => {
-      const userCount = row.user_count ?? row.users?.length ?? 0;
-      return (
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{v}</span>
-          {userCount > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-              {userCount} users
-            </span>
-          )}
-        </div>
-      )
-    }
-  },
   { key: 'trade_name', label: 'Trade Name' },
   { key: 'contact_person_name', label: 'Contact Person' },
   { key: 'mobile_number', label: 'Mobile' },
@@ -58,7 +43,33 @@ export default function Transporters() {
   const canCreateTransporter = hasPermission('Transporters (Create)');
   const [transporters, setTransporters] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [trucks, setTrucks] = useState([]);
+  const [pickups, setPickups] = useState([]);
+  const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const tableColumns = [
+    {
+      key: 'name', label: 'Transporter Name', render: (v, row) => {
+        const userCount = row.user_count ?? row.users?.length ?? 0;
+        const truckCount = trucks.filter(t => t.transporter_id === row.id).length;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{v}</span>
+            {userCount > 0 && (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                {userCount} users
+              </span>
+            )}
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full border flex items-center gap-1.5">
+              <Truck className="w-3.5 h-3.5" /> {truckCount}
+            </span>
+          </div>
+        )
+      }
+    },
+    ...columns
+  ];
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -117,13 +128,17 @@ console.log(transporters)
 
   const fetchTransporters = async () => {
     try {
-      const [transportersRes, companiesRes] = await Promise.all([
+      const [transportersRes, companiesRes, trucksRes, pickupsRes] = await Promise.all([
         transportersApi.getAll(),
-        companiesApi.getAll()
+        companiesApi.getAll(),
+        trucksApi.getAll(),
+        pickupApi.getAll({ page_size: 500 })
       ]);
       console.log(transportersRes.data);
       setTransporters(transportersRes.data);
       setCompanies(companiesRes.data || []);
+      setTrucks(trucksRes.data || []);
+      setPickups(pickupsRes.data || []);
     } catch (error) {
       toast.error('Failed to load transporters');
     } finally {
@@ -378,21 +393,34 @@ console.log(transporters)
 
   const industryOptions = ['Cement', 'Iron and Steel', 'FMCG', 'Construction', 'Agriculture', 'Chemicals', 'Other'];
 
-  // Custom actions for DataTable with Manage Users button
-  const customActions = (item) => (
-    <div className="flex items-center gap-1">
-      {canViewTransporterUsers && (
+  // Custom actions for DataTable with Manage Users + Expand Trucks
+  const customActions = (item) => {
+    const isExpanded = expandedId === item.id;
+    const truckCount = trucks.filter(t => t.transporter_id === item.id).length;
+    return (
+      <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleManageUsers(item)}
-          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+          className={`${isExpanded ? 'bg-slate-100' : ''} hover:bg-slate-100`}
+          title={`${truckCount} trucks — ${isExpanded ? 'Collapse' : 'Expand'}`}
         >
-          <Users className="w-4 h-4" />
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </Button>
-      )}
-    </div>
-  );
+        {canViewTransporterUsers && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleManageUsers(item)}
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            <Users className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <PageLayout
@@ -425,7 +453,7 @@ console.log(transporters)
       }
     >
       <DataTable
-        columns={columns}
+        columns={tableColumns}
         data={transporters}
         loading={loading}
         onEdit={hasActionPermission('update_transporter') ? handleEdit : undefined}
@@ -433,6 +461,94 @@ console.log(transporters)
         customActions={customActions}
         emptyMessage="No transporters found. Add your first transporter!"
       />
+
+      {/* Trucks accordion — per transporter */}
+      {expandedId && (() => {
+        const transporter = transporters.find(t => t.id === expandedId);
+        const tTrucks = trucks.filter(t => t.transporter_id === expandedId);
+        const getDisplayStatus = (truck) => {
+          const related = pickups.filter(p => p.truck_number === truck.vehicle_number);
+          if (related.length) {
+            const active = related.filter(p => !['rescheduled','rejected'].includes((p.status||'').toLowerCase()));
+            const pool = active.length ? active : related;
+            pool.sort((a,b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
+            const s = pool[0]?.status;
+            if (s) return s;
+          }
+          return truck.current_status || 'Idle';
+        };
+        const grouped = tTrucks.reduce((acc, truck) => {
+          const s = getDisplayStatus(truck);
+          (acc[s] = acc[s] || []).push(truck);
+          return acc;
+        }, {});
+        const statusOrder = ['Idle', 'Scheduled', 'loading_started', 'Loaded', 'loading done', 'verified'];
+        const sortedStatuses = Object.keys(grouped).sort((a,b) => {
+          const ia = statusOrder.indexOf(a); const ib = statusOrder.indexOf(b);
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        const statusColor = (s) => {
+          if (s === 'Idle') return 'bg-slate-100 text-slate-700 border-slate-200';
+          if (s.toLowerCase().includes('loaded')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+          if (s.toLowerCase().includes('loading')) return 'bg-amber-50 text-amber-700 border-amber-200';
+          if (s.toLowerCase().includes('scheduled')) return 'bg-blue-50 text-blue-700 border-blue-200';
+          if (s.toLowerCase().includes('verified')) return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+          return 'bg-gray-50 text-gray-700 border-gray-200';
+        };
+        return (
+          <Card className="mt-4 border-2 border-slate-200 shadow-sm">
+            <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between py-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Truck className="w-4 h-4 text-slate-600" />
+                {transporter?.name} — Trucks ({tTrucks.length})
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setExpandedId(null)}>
+                <X className="w-4 h-4 mr-1" /> Close
+              </Button>
+            </CardHeader>
+            <CardContent className="p-4">
+              {tTrucks.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Package className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">No trucks assigned to this transporter</p>
+                  <p className="text-xs text-slate-400">Trucks will appear here once created with this transporter</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {sortedStatuses.map(status => (
+                    <div key={status} className="border rounded-lg overflow-hidden">
+                      <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${statusColor(status)}`}>
+                          {status}
+                        </span>
+                        <span className="text-xs bg-white border px-2.5 py-1 rounded-full font-bold">{grouped[status].length}</span>
+                      </div>
+                      <div className="divide-y">
+                        {grouped[status].map(truck => {
+                          const dispStatus = getDisplayStatus(truck);
+                          return (
+                            <div key={truck.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                              <div>
+                                <p className="font-mono text-sm font-semibold">{truck.vehicle_number}</p>
+                                <p className="text-xs text-slate-500 flex items-center gap-2">
+                                  {truck.driver_name || '—'} • {truck.capacity_mt ? `${truck.capacity_mt} MT` : '—'} {truck.transporter_name ? `• ${truck.transporter_name}` : ''}
+                                </p>
+                              </div>
+                              <span className={`text-xs px-2 py-1 rounded-full border font-medium ${statusColor(dispStatus)}`}>
+                                {dispStatus}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <FormModal
         open={modalOpen}

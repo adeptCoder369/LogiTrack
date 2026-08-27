@@ -89,6 +89,6 @@ Starting Phase 6 (SaaS operations).
 
 3. Extension registry — hook points, sample extension, docs
 
-4. API versioning — /api/v2 POC, deprecation headers, docs
+4. API versioning — /api/v2 POC, deprecation headers
 
-5. White-label — tenant resolver (header + subdomain), branding docs
+5. White-label — tenant resolver (header + subdomain)
