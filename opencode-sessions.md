@@ -3,19 +3,8 @@ uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 =======================================================
 system prompts
 =======================================================
-Don’t explain things to me in overly technical terms.
-
-I’m trying to understand the actual flow and confirm my understanding by performing the steps myself.
-
-So from now on, explain it **straight and practically**:
-
-* Tell me what happens.
-* Tell me what I need to do.
-* Tell me what I should see.
-* Then let me perform it and confirm the result.
-
-Keep the explanation simple and direct. Don’t overcomplicate it with unnecessary technical terminology unless I specifically ask for the technical details.
-
+dont test , for now until ask 
+just implement what i am asking for and report back as soon as you can 
 =======================================================
 =======================================================
 

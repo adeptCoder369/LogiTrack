@@ -27,6 +27,46 @@ export default function Login() {
   const { login, loginWithOtp } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState('main'); // main, loginOtp, forgotPassword, firstTimeSetup
+  const [loginMode, setLoginMode] = useState('workspace'); // 'workspace' | 'platform'
+  const isPlatform = loginMode === 'platform';
+  // Platform owner never sends a tenant; workspace users send their company code
+  const effTenant = (t) => (isPlatform ? undefined : (t && t.trim() ? t.trim().toLowerCase() : undefined));
+  const switchMode = (mode) => {
+    setLoginMode(mode);
+    setLoginData(d => ({ ...d, tenant: '' }));
+    setOtpLoginData(d => ({ ...d, tenant: '' }));
+    setForgotData(d => ({ ...d, tenant: '' }));
+    setFirstTimeData(d => ({ ...d, tenant: '' }));
+  };
+  const friendlyLoginError = (error, fallback) => {
+    const detail = error.response?.data?.detail || fallback;
+    if (!isPlatform && /more than one workspace/i.test(detail)) {
+      return 'This number is used in more than one company — please enter your company code.';
+    }
+    return detail;
+  };
+  const renderModeTabs = () => (
+    <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg mb-4">
+      <button
+        type="button"
+        onClick={() => switchMode('workspace')}
+        data-testid="login-tab-workspace"
+        className={`flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${!isPlatform ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+      >
+        <Building2 className="w-4 h-4" />
+        Company login
+      </button>
+      <button
+        type="button"
+        onClick={() => switchMode('platform')}
+        data-testid="login-tab-platform"
+        className={`flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${isPlatform ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+      >
+        <ShieldCheck className="w-4 h-4" />
+        Platform owner
+      </button>
+    </div>
+  );
 
   // Login states
   const [loginData, setLoginData] = useState({
@@ -115,7 +155,7 @@ export default function Login() {
         mobile: loginData.mobile,
         country_code: loginData.countryCode,
         password: loginData.password,
-        tenant: loginData.tenant || undefined
+        tenant: effTenant(loginData.tenant)
       });
 
       // Check if this is a first-time login
@@ -142,7 +182,7 @@ export default function Login() {
         window.location.reload(); // Force refresh to update auth state
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Login failed');
+      toast.error(friendlyLoginError(error, 'Login failed'));
     } finally {
       setLoading(false);
     }
@@ -169,7 +209,7 @@ export default function Login() {
         country_code: firstTimeData.countryCode,
         otp_code: firstTimeData.otp,
         new_password: firstTimeData.newPassword,
-        tenant: firstTimeData.tenant || undefined
+        tenant: effTenant(firstTimeData.tenant)
       });
 
       const { token, user } = response.data;
@@ -196,7 +236,7 @@ export default function Login() {
       const response = await authApi.requestLoginOtp({
         mobile: otpLoginData.mobile,
         country_code: otpLoginData.countryCode,
-        tenant: otpLoginData.tenant || undefined
+        tenant: effTenant(otpLoginData.tenant)
       });
       toast.success(response.data.message);
       setOtpLoginData(prev => ({ ...prev, step: 'otp' }));
@@ -215,11 +255,11 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      await loginWithOtp(otpLoginData.mobile, otpLoginData.countryCode, otpLoginData.otp, otpLoginData.tenant || undefined);
+      await loginWithOtp(otpLoginData.mobile, otpLoginData.countryCode, otpLoginData.otp, effTenant(otpLoginData.tenant));
       toast.success('Login successful!');
       navigate('/');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid OTP');
+      toast.error(friendlyLoginError(error, 'Invalid OTP'));
     } finally {
       setLoading(false);
     }
@@ -236,7 +276,7 @@ export default function Login() {
       const response = await authApi.forgotPassword({
         mobile: forgotData.mobile,
         country_code: forgotData.countryCode,
-        tenant: forgotData.tenant || undefined
+        tenant: effTenant(forgotData.tenant)
       });
       toast.success(response.data.message);
       setForgotData(prev => ({ ...prev, step: 'otp' }));
@@ -272,7 +312,7 @@ export default function Login() {
         country_code: forgotData.countryCode,
         otp_code: forgotData.otp,
         new_password: forgotData.newPassword,
-        tenant: forgotData.tenant || undefined
+        tenant: effTenant(forgotData.tenant)
       });
       toast.success('Password reset successfully! Please login.');
       setActiveView('main');
@@ -302,7 +342,7 @@ export default function Login() {
           mobile: firstTimeData.mobile,
           country_code: firstTimeData.countryCode,
           password: '', // Empty password triggers OTP for first-time users
-          tenant: firstTimeData.tenant || undefined
+          tenant: effTenant(firstTimeData.tenant)
         });
         if (response.data.first_time_login) {
           toast.success(response.data.message);
@@ -396,21 +436,27 @@ export default function Login() {
     </div>
   );
 
-  const renderTenantInput = (data, setData, prefix = '') => (
-    <div className="space-y-2">
-      <Label htmlFor={`${prefix}tenant`}>
-        Tenant <span className="text-slate-400 font-normal">(optional — required only if your mobile exists in more than one workspace)</span>
-      </Label>
-      <Input
-        id={`${prefix}tenant`}
-        value={data.tenant}
-        onChange={(e) => setData({ ...data, tenant: e.target.value.trim().toLowerCase() })}
-        placeholder="Workspace slug"
-        className="pl-10"
-        data-testid={`${prefix}tenant`}
-      />
-    </div>
-  );
+  const renderTenantInput = (data, setData, prefix = '') => {
+    if (isPlatform) return null;
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={`${prefix}tenant`}>
+          Company code <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id={`${prefix}tenant`}
+          value={data.tenant}
+          onChange={(e) => setData({ ...data, tenant: e.target.value.trim().toLowerCase() })}
+          placeholder="e.g. acme"
+          className="pl-10"
+          data-testid={`${prefix}tenant`}
+        />
+        <p className="text-xs text-slate-500">
+          The short code for your company — your admin gives this to you.
+        </p>
+      </div>
+    );
+  };
 
   const renderOtpInput = (value, onChange, purpose) => (
     <div className="space-y-2">
@@ -451,8 +497,9 @@ export default function Login() {
   const renderMainLogin = () => (
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        <CardTitle style={{ fontFamily: 'Manrope' }}>Welcome Back</CardTitle>
-        <CardDescription>Sign in to your account</CardDescription>
+        {renderModeTabs()}
+        <CardTitle style={{ fontFamily: 'Manrope' }}>{isPlatform ? 'Platform Sign In' : 'Welcome Back'}</CardTitle>
+        <CardDescription>{isPlatform ? 'Owner sign-in — manages all companies' : 'Sign in to your company workspace'}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handlePasswordLogin} className="space-y-4">
@@ -519,6 +566,7 @@ export default function Login() {
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
         {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', tenant: '', step: 'mobile' }))}
+        {renderModeTabs()}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Login with OTP</CardTitle>
         <CardDescription>
           {otpLoginData.step === 'mobile'
@@ -562,6 +610,7 @@ export default function Login() {
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
         {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' }))}
+        {renderModeTabs()}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Reset Password</CardTitle>
         <CardDescription>
           {forgotData.step === 'mobile' && 'Enter your registered mobile number'}
@@ -773,9 +822,13 @@ export default function Login() {
           </div>
         </div>
         <div className="w-full max-w-md">
-          {/* subtle tenant hint */}
+          {/* subtle mode hint */}
           <div className="mb-4 flex items-center justify-center gap-2 text-[11px] text-slate-500">
-            <span className="px-2 py-1 rounded-full bg-white border text-slate-600">Tenant slug required only if mobile in multiple workspaces</span>
+            <span className="px-2 py-1 rounded-full bg-white border text-slate-600">
+              {isPlatform
+                ? 'Platform owner — no company code needed'
+                : 'Company staff — log in with the mobile your admin registered'}
+            </span>
           </div>
           {activeView === 'main' && renderMainLogin()}
           {activeView === 'loginOtp' && renderLoginOtp()}
