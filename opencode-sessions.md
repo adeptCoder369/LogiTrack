@@ -3,8 +3,8 @@ uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 =======================================================
 system prompts
 =======================================================
-dont test , for now until ask 
-just implement what i am asking for and report back as soon as you can 
+dont test , dont npm run build ,atleast  for now until ask; 
+just implement what i am asking for and report back as soon as you can , and response in less token and less verbose , jsut report what you have implemented  
 =======================================================
 =======================================================
 

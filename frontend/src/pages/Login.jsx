@@ -11,13 +11,30 @@ import { toast } from 'sonner';
 import { Truck, ArrowLeft, Phone, Lock, KeyRound, RefreshCw, UserPlus, ShieldCheck, Package, Warehouse, BarChart3, Building2, ArrowRightLeft } from 'lucide-react';
 
 const COUNTRY_CODES = [
-  { code: "91", name: "India", flag: "🇮🇳" },
-  { code: "977", name: "Nepal", flag: "🇳🇵" },
-  { code: "880", name: "Bangladesh", flag: "🇧🇩" },
-  { code: "84", name: "Vietnam", flag: "🇻🇳" },
-  { code: "975", name: "Bhutan", flag: "🇧🇹" },
-  { code: "971", name: "UAE", flag: "🇦🇪" },
+  { code: "91", name: "India", iso: "in", flag: "🇮🇳" },
+  { code: "977", name: "Nepal", iso: "np", flag: "🇳🇵" },
+  { code: "880", name: "Bangladesh", iso: "bd", flag: "🇧🇩" },
+  { code: "84", name: "Vietnam", iso: "vn", flag: "🇻🇳" },
+  { code: "975", name: "Bhutan", iso: "bt", flag: "🇧🇹" },
+  { code: "971", name: "UAE", iso: "ae", flag: "🇦🇪" },
 ];
+
+// Real flag image with emoji fallback if the CDN is unreachable
+const FlagIcon = ({ country }) => (
+  <span className="inline-flex items-center flex-shrink-0">
+    <img
+      src={`https://flagcdn.com/w40/${country.iso}.png`}
+      alt={country.name}
+      className="w-5 h-3.5 object-cover rounded-[2px] shadow-sm"
+      loading="lazy"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+        if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'inline';
+      }}
+    />
+    <span style={{ display: 'none' }}>{country.flag}</span>
+  </span>
+);
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_SECONDS = 120;
@@ -415,7 +432,10 @@ export default function Login() {
           <SelectContent>
             {COUNTRY_CODES.map((c) => (
               <SelectItem key={c.code} value={c.code}>
-                {c.flag} +{c.code}
+                <span className="flex items-center gap-1.5">
+                  <FlagIcon country={c} />
+                  <span>+{c.code}</span>
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
