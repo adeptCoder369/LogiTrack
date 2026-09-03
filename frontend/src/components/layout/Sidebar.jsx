@@ -89,7 +89,8 @@ export const Sidebar = () => {
 
   // Tenant branding (Phase 0); falls back to icon when no custom logo.
   const branding = tenant?.branding || {};
-  const brandName = branding.name || 'IBRMCO';
+  const brandName = (branding.name || '').trim() || tenant?.tenant?.name || 'IBRMCO';
+  const tenantSlug = tenant?.tenant?.slug || '';
   const rawLogo = branding.logo || '';
   const hasCustomLogo = !!rawLogo;
   const brandLogo = hasCustomLogo
@@ -176,30 +177,36 @@ export const Sidebar = () => {
           max-lg:top-16 max-lg:h-[calc(100vh-4rem)]
         `}
       >
-        {/* UPPER SECTION: Logo Header — pro: image if uploaded, else icon */}
-        <div className="hidden lg:flex flex-col items-center justify-center px-6 py-6 border-b border-slate-800/60 bg-slate-950/30 backdrop-blur-sm">
+        {/* UPPER SECTION: Logo Header — pro brand lockup: logo + tenant name */}
+        <div className="hidden lg:flex items-center gap-3 px-5 h-20 border-b border-slate-800/60 bg-slate-950/30 backdrop-blur-sm">
           {hasCustomLogo && !logoError ? (
-            <>
-              <div className="bg-white rounded-xl p-2.5 shadow-lg border border-white/20 max-w-[180px] w-full flex items-center justify-center">
-                <img
-                  src={brandLogo}
-                  alt={brandName}
-                  className="max-h-10 max-w-full object-contain"
-                  onError={() => setLogoError(true)}
-                />
-              </div>
-              <p className="text-[10px] tracking-[0.22em] text-slate-400 uppercase mt-3 font-semibold">{brandName}</p>
-            </>
+            <div className="w-11 h-11 bg-white rounded-xl p-1.5 shadow-lg border border-white/20 flex-shrink-0 flex items-center justify-center">
+              <img
+                src={brandLogo}
+                alt={brandName}
+                className="max-h-full max-w-full object-contain"
+                onError={() => setLogoError(true)}
+              />
+            </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center shadow-lg shadow-black/20">
-                <Truck className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-[15px] font-bold text-white tracking-widest uppercase font-sans">
-                {brandName}
-              </h1>
+            <div className="w-11 h-11 brand-gradient rounded-xl flex items-center justify-center shadow-lg shadow-black/20 flex-shrink-0">
+              <Truck className="w-5 h-5 text-white" />
             </div>
           )}
+          <div className="min-w-0">
+            <h1
+              className="text-[15px] font-bold text-white leading-tight truncate"
+              style={{ fontFamily: 'Manrope' }}
+              title={brandName}
+            >
+              {brandName}
+            </h1>
+            {tenantSlug && (
+              <p className="text-[10px] tracking-[0.18em] text-slate-400 uppercase font-semibold truncate mt-0.5">
+                {tenantSlug}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* PROFILE SECTION: User Details & Dynamic Meta Pills */}
