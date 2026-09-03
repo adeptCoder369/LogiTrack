@@ -1,4 +1,5 @@
 """Tenant management (platform / master admin) + tenant config endpoint."""
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -70,6 +71,35 @@ def _to_dict(tenant, owner=None) -> dict:
 async def tenant_config(current_user: dict = Depends(get_current_user)):
     """Branding + flags + plan for the authenticated user's tenant."""
     return await get_tenant_config(current_user)
+
+
+_PUBLIC_SLUG_RE = re.compile(r"^[a-z0-9-]{1,64}$")
+
+
+@router.get("/tenants/public/{slug}")
+async def public_tenant_branding(slug: str):
+    """Public branding for login-page re-decor. No auth. Safe: strict slug
+    format check + parameterized query + branding-only fields returned."""
+    slug = (slug or "").strip().lower()
+    if not _PUBLIC_SLUG_RE.match(slug):
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    async with AsyncSessionLocal() as session:
+        tenant = (await session.execute(
+            select(sql_models.Tenant).where(sql_models.Tenant.slug == slug)
+        )).scalar_one_or_none()
+    if not tenant or tenant.status != "active":
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    b = tenant.branding or {}
+    return {
+        "name": tenant.name,
+        "slug": tenant.slug,
+        "branding": {
+            "name": b.get("name"),
+            "logo": b.get("logo"),
+            "primary": b.get("primary"),
+            "accent": b.get("accent"),
+        },
+    }
 
 
 @router.get("/tenants")

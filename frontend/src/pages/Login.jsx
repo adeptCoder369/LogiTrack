@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { authApi } from '../lib/api';
+import { authApi, tenantApi } from '../lib/api';
+import { applyBranding } from '../lib/theme';
+
+const DEFAULT_BRANDING = { primary: '222 47% 11%', accent: '24 95% 53%' };
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -54,6 +57,8 @@ export default function Login() {
     setOtpLoginData(d => ({ ...d, tenant: '' }));
     setForgotData(d => ({ ...d, tenant: '' }));
     setFirstTimeData(d => ({ ...d, tenant: '' }));
+    setFoundTenant(null);
+    applyBranding(DEFAULT_BRANDING);
   };
   const friendlyLoginError = (error, fallback) => {
     const detail = error.response?.data?.detail || fallback;
@@ -123,6 +128,29 @@ export default function Login() {
     tenant: '',
     demoOtp: ''
   });
+
+  // Re-decor login page with the typed company's brand (debounced, branding-only public lookup)
+  const [foundTenant, setFoundTenant] = useState(null);
+  useEffect(() => {
+    if (isPlatform || activeView !== 'main') return;
+    const slug = (loginData.tenant || '').trim().toLowerCase();
+    if (!slug) {
+      setFoundTenant(null);
+      applyBranding(DEFAULT_BRANDING);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await tenantApi.getPublic(slug);
+        setFoundTenant(res.data);
+        applyBranding(res.data?.branding || DEFAULT_BRANDING);
+      } catch {
+        setFoundTenant(null);
+        applyBranding(DEFAULT_BRANDING);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [loginData.tenant, isPlatform, activeView]);
 
   // OTP timer
   const [otpTimer, setOtpTimer] = useState(0);
@@ -842,6 +870,21 @@ export default function Login() {
           </div>
         </div>
         <div className="w-full max-w-md">
+          {/* found-tenant brand chip */}
+          {!isPlatform && foundTenant && (
+            <div className="mb-4 flex items-center justify-center gap-2.5 bg-white border rounded-xl px-4 py-2.5 shadow-sm">
+              {foundTenant.branding?.logo && (foundTenant.branding.logo.startsWith('http') || foundTenant.branding.logo.startsWith('data:')) ? (
+                <img src={foundTenant.branding.logo} alt={foundTenant.name} className="h-7 max-w-[90px] object-contain" />
+              ) : (
+                <div className="w-7 h-7 brand-gradient rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                  {(foundTenant.branding?.name || foundTenant.name || '?').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="text-sm font-semibold text-slate-900">
+                You're signing in to {foundTenant.branding?.name || foundTenant.name}
+              </span>
+            </div>
+          )}
           {/* subtle mode hint */}
           <div className="mb-4 flex items-center justify-center gap-2 text-[11px] text-slate-500">
             <span className="px-2 py-1 rounded-full bg-white border text-slate-600">

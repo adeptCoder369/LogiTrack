@@ -302,6 +302,7 @@ export const tenantApi = {
   create: (data) => api.post('/tenants', data),
   update: (id, data) => api.put(`/tenants/${id}`, data),
   remove: (id) => api.delete(`/tenants/${id}`),
+  getPublic: (slug) => api.get(`/tenants/public/${encodeURIComponent(slug)}`),
 };
 
 // Product Access
