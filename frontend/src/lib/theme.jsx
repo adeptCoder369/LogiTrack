@@ -21,6 +21,12 @@ export function applyBranding(branding) {
     root.style.setProperty('--accent-foreground', '0 0% 100%');
     root.style.setProperty('--chart-2', b.accent);
   }
+  if (b.secondary) {
+    root.style.setProperty('--brand-secondary', b.secondary);
+  }
+  if (b.text) {
+    root.style.setProperty('--brand-text', b.text);
+  }
   if (b.name) {
     document.title = `${b.name} | ${APP_NAME}`;
   }

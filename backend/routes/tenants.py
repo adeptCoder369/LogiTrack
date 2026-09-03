@@ -98,6 +98,8 @@ async def public_tenant_branding(slug: str):
             "logo": b.get("logo"),
             "primary": b.get("primary"),
             "accent": b.get("accent"),
+            "secondary": b.get("secondary"),
+            "text": b.get("text"),
         },
     }
 

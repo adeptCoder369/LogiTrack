@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { authApi, tenantApi } from '../lib/api';
 import { applyBranding } from '../lib/theme';
 
-const DEFAULT_BRANDING = { primary: '222 47% 11%', accent: '24 95% 53%' };
+const DEFAULT_BRANDING = { primary: '222 47% 11%', accent: '24 95% 53%', secondary: '0 0% 100%', text: '222 84% 5%' };
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -557,7 +557,7 @@ export default function Login() {
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
         {renderModeTabs()}
-        <CardTitle style={{ fontFamily: 'Manrope' }}>{isPlatform ? 'Platform Sign In' : 'Welcome Back'}</CardTitle>
+        <CardTitle className="text-brand-text" style={{ fontFamily: 'Manrope' }}>{isPlatform ? 'Platform Sign In' : 'Welcome Back'}</CardTitle>
         <CardDescription>{isPlatform ? 'Owner sign-in — manages all companies' : 'Sign in to your company workspace'}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -626,7 +626,7 @@ export default function Login() {
       <CardHeader className="text-center pb-2">
         {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', tenant: '', step: 'mobile' }))}
         {renderModeTabs()}
-        <CardTitle style={{ fontFamily: 'Manrope' }}>Login with OTP</CardTitle>
+        <CardTitle className="text-brand-text" style={{ fontFamily: 'Manrope' }}>Login with OTP</CardTitle>
         <CardDescription>
           {otpLoginData.step === 'mobile'
             ? 'Enter your registered mobile number'
@@ -670,7 +670,7 @@ export default function Login() {
       <CardHeader className="text-center pb-2">
         {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' }))}
         {renderModeTabs()}
-        <CardTitle style={{ fontFamily: 'Manrope' }}>Reset Password</CardTitle>
+        <CardTitle className="text-brand-text" style={{ fontFamily: 'Manrope' }}>Reset Password</CardTitle>
         <CardDescription>
           {forgotData.step === 'mobile' && 'Enter your registered mobile number'}
           {forgotData.step === 'otp' && `Enter OTP sent to +${forgotData.countryCode}${forgotData.mobile}`}
@@ -757,7 +757,7 @@ export default function Login() {
   const renderFirstTimeSetup = () => (
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        <CardTitle style={{ fontFamily: 'Manrope' }}>Welcome!</CardTitle>
+        <CardTitle className="text-brand-text" style={{ fontFamily: 'Manrope' }}>Welcome!</CardTitle>
         <CardDescription>
           An OTP has been sent to +{firstTimeData.countryCode}{firstTimeData.mobile}.
           <br />Please verify and set your password.
@@ -851,8 +851,8 @@ export default function Login() {
               { icon: ShieldCheck, label: 'Role-based Access', desc: 'Products / Depots / Tenants scoped' },
             ].map(item => (
               <div key={item.label} className="flex gap-3 items-center bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/10">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4 text-slate-900" />
+                <div className="w-8 h-8 bg-brand-secondary rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <item.icon className="w-4 h-4 text-brand-text" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold leading-none">{item.label}</p>
@@ -908,7 +908,7 @@ export default function Login() {
                 >
                   {(foundTenant.branding?.name || foundTenant.name || '?').charAt(0).toUpperCase()}
                 </div>
-                <span className="text-sm font-semibold text-slate-900">
+                <span className="text-sm font-semibold text-brand-text">
                   You're signing in to {foundTenant.branding?.name || foundTenant.name}
                 </span>
               </div>

@@ -67,9 +67,16 @@ code, .mono {
 }
 
 /* Brand utilities — tenant primary/accent via CSS vars set by theme.jsx */
+:root {
+  --brand-secondary: 0 0% 100%;
+  --brand-text: 222 84% 5%;
+}
+
 .bg-brand { background-color: hsl(var(--primary)); }
 .text-brand { color: hsl(var(--primary)); }
 .border-brand { border-color: hsl(var(--primary)); }
+.bg-brand-secondary { background-color: hsl(var(--brand-secondary)); }
+.text-brand-text { color: hsl(var(--brand-text)); }
 .bg-accent-brand { background-color: hsl(var(--accent)); }
 .text-accent-brand { color: hsl(var(--accent)); }
 .brand-gradient { background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%); }

@@ -92,6 +92,8 @@ export default function TenantsPage() {
     brandingLogo: "",
     brandingPrimary: "",
     brandingAccent: "",
+    brandingSecondary: "",
+    brandingText: "",
     featureFlags: "",
     ownerName: "",
     ownerMobile: "",
@@ -141,6 +143,8 @@ export default function TenantsPage() {
         logo: formData.brandingLogo,
         primary: formData.brandingPrimary,
         accent: formData.brandingAccent,
+        secondary: formData.brandingSecondary,
+        text: formData.brandingText,
       },
       feature_flags: formData.featureFlags
         ? Object.fromEntries(
@@ -182,7 +186,7 @@ export default function TenantsPage() {
         }
       }
       setShowSidebar(false);
-      setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", featureFlags: "", ownerName: "", ownerMobile: "", ownerEmail: "" });
+      setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", brandingSecondary: "", brandingText: "", featureFlags: "", ownerName: "", ownerMobile: "", ownerEmail: "" });
       setEditingTenant(null);
     } catch (error) {
       console.error('Failed to save tenant', error);
@@ -224,6 +228,8 @@ export default function TenantsPage() {
       brandingLogo: branding.logo || "",
       brandingPrimary: branding.primary || "",
       brandingAccent: branding.accent || "",
+      brandingSecondary: branding.secondary || "",
+      brandingText: branding.text || "",
       featureFlags: Object.keys(tenant.feature_flags || {}).join(', '),
       ownerName: "",
       ownerMobile: "",
@@ -251,7 +257,7 @@ export default function TenantsPage() {
         <button
           onClick={() => {
             setEditingTenant(null);
-            setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", featureFlags: "", ownerName: "", ownerMobile: "", ownerEmail: "" });
+            setFormData({ name: "", slug: "", status: "active", subscription_plan: "", brandingName: "", brandingLogo: "", brandingPrimary: "", brandingAccent: "", brandingSecondary: "", brandingText: "", featureFlags: "", ownerName: "", ownerMobile: "", ownerEmail: "" });
             setShowSidebar(true);
           }}
           className="flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 text-primary-foreground font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all duration-200 self-start md:self-auto"
@@ -599,11 +605,54 @@ export default function TenantsPage() {
                       </div>
                       <p className="text-[10px] text-slate-400 mt-1">HSL triplet, picker auto-converts.</p>
                     </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Secondary</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={hslToHex(formData.brandingSecondary || '0 0% 100%')}
+                          onChange={(e) => setFormData(prev => ({ ...prev, brandingSecondary: hexToHsl(e.target.value) }))}
+                          className="w-10 h-9 p-1 border rounded cursor-pointer bg-white"
+                          title="Pick secondary color"
+                        />
+                        <input
+                          type="text"
+                          name="brandingSecondary"
+                          placeholder="0 0% 100%"
+                          value={formData.brandingSecondary}
+                          onChange={handleInputChange}
+                          className="flex-1 text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Tiles, badges & surfaces.</p>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Text</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={hslToHex(formData.brandingText || '222 84% 5%')}
+                          onChange={(e) => setFormData(prev => ({ ...prev, brandingText: hexToHsl(e.target.value) }))}
+                          className="w-10 h-9 p-1 border rounded cursor-pointer bg-white"
+                          title="Pick text color"
+                        />
+                        <input
+                          type="text"
+                          name="brandingText"
+                          placeholder="222 84% 5%"
+                          value={formData.brandingText}
+                          onChange={handleInputChange}
+                          className="flex-1 text-xs p-2.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Headings & key text on light surfaces.</p>
+                    </div>
                   </div>
-                  <div className="mt-4 p-3 rounded-lg border bg-slate-50 flex items-center gap-3">
+                  <div className="mt-4 p-3 rounded-lg border bg-slate-50 flex items-center gap-3 flex-wrap">
                     <span className="text-[11px] font-semibold text-slate-500">Preview:</span>
                     <span className="px-3 py-1.5 rounded-md text-xs font-bold shadow-sm" style={{ backgroundColor: `hsl(${formData.brandingPrimary || '222 47% 11%'})`, color: 'hsl(210 40% 98%)' }}>Primary</span>
                     <span className="px-3 py-1.5 rounded-md text-xs font-bold shadow-sm" style={{ backgroundColor: `hsl(${formData.brandingAccent || '24 95% 53%'})`, color: 'white' }}>Accent</span>
+                    <span className="px-3 py-1.5 rounded-md text-xs font-bold shadow-sm border" style={{ backgroundColor: `hsl(${formData.brandingSecondary || '0 0% 100%'})`, color: `hsl(${formData.brandingText || '222 84% 5%'})` }}>Secondary + Text</span>
                     <span className="w-8 h-8 rounded-md border shadow-sm brand-gradient" style={{ background: `linear-gradient(135deg, hsl(${formData.brandingPrimary || '222 47% 11%'}) 0%, hsl(${formData.brandingAccent || '24 95% 53%'}) 100%)` }} title="Gradient preview" />
                   </div>
                 </div>
