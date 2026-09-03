@@ -44,7 +44,7 @@ class TenantUpdate(BaseModel):
     feature_flags: Optional[dict] = None
 
 
-def _to_dict(tenant, owner=None) -> dict:
+def _to_dict(tenant, owner=None, subscription_status=None) -> dict:
     d = {
         "id": tenant.id,
         "name": tenant.name,
@@ -53,6 +53,7 @@ def _to_dict(tenant, owner=None) -> dict:
         "subscription_plan": tenant.subscription_plan,
         "branding": tenant.branding or {},
         "feature_flags": tenant.feature_flags or {},
+        "subscription_status": subscription_status,
         "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
     }
     if owner:
@@ -164,7 +165,14 @@ async def list_tenants(current_user: dict = Depends(get_current_user)):
                     owner = (await session.execute(
                         select(sql_models.User).where(sql_models.User.tenant_id == t.id).order_by(sql_models.User.created_at).limit(1)
                     )).scalar_one_or_none()
-            out.append(_to_dict(t, owner))
+            try:
+                sub = (await session.execute(
+                    select(sql_models.Subscription).where(sql_models.Subscription.tenant_id == t.id)
+                )).scalar_one_or_none()
+                sub_status = sub.status if sub else None
+            except Exception:
+                sub_status = None
+            out.append(_to_dict(t, owner, sub_status))
         return out
 
 

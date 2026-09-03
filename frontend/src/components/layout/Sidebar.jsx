@@ -207,11 +207,18 @@ export const Sidebar = () => {
             >
               {brandName}
             </h1>
-            {tenantSlug && (
-              <p className="text-[10px] tracking-[0.18em] text-slate-400 uppercase font-semibold truncate mt-0.5">
-                {tenantSlug}
-              </p>
-            )}
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {tenantSlug && (
+                <p className="text-[10px] tracking-[0.18em] text-slate-400 uppercase font-semibold truncate">
+                  {tenantSlug}
+                </p>
+              )}
+              {tenant?.subscription_status === 'trialing' && (
+                <span className="px-1.5 py-px rounded text-[9px] font-bold bg-violet-500/20 text-violet-300 border border-violet-400/30 tracking-wider flex-shrink-0" title="Trial subscription">
+                  TRIAL
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

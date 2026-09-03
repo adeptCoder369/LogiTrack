@@ -383,9 +383,16 @@ export default function TenantsPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${STATUS_STYLES[tenant.status] || STATUS_STYLES.active}`}>
-                        {tenant.status || 'active'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${STATUS_STYLES[tenant.status] || STATUS_STYLES.active}`}>
+                          {tenant.status || 'active'}
+                        </span>
+                        {tenant.subscription_status === 'trialing' && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-violet-50 text-violet-700 border-violet-200 tracking-wide" title="Trial subscription">
+                            TRIAL
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-700 font-medium">
                       {tenant.subscription_plan || "—"}

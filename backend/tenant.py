@@ -87,10 +87,21 @@ def tenant_id_for_current_user(user: dict) -> Optional[str]:
 
 
 async def get_tenant_config(user: dict) -> dict:
+    from sqlalchemy import select as _select
+    import models_sqlalchemy as _models
     tenant_id = user.get("tenant_id") or PLATFORM_TENANT_ID
     tenant = await _load_tenant_row(tenant_id)
     if tenant is None:
         raise HTTPException(status_code=404, detail="Tenant config not found")
+    subscription_status = None
+    try:
+        async with AsyncSessionLocal() as session:
+            sub = (await session.execute(
+                _select(_models.Subscription).where(_models.Subscription.tenant_id == tenant_id)
+            )).scalar_one_or_none()
+            subscription_status = sub.status if sub else None
+    except Exception:
+        subscription_status = None
     return {
         "tenant": {
             "id": tenant.id,
@@ -102,6 +113,7 @@ async def get_tenant_config(user: dict) -> dict:
         "branding": tenant.branding or {},
         "feature_flags": tenant.feature_flags or {},
         "subscription_plan": tenant.subscription_plan,
+        "subscription_status": subscription_status,
     }
 
 
