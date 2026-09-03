@@ -102,6 +102,41 @@ async def public_tenant_branding(slug: str):
     }
 
 
+@router.get("/tenants/public/{slug}/logo")
+async def public_tenant_logo(slug: str):
+    """Public tenant logo for the login page. No auth. Only serves the logo
+    file recorded in that tenant's branding; anything else → 404."""
+    from fastapi.responses import FileResponse, RedirectResponse
+    slug = (slug or "").strip().lower()
+    if not _PUBLIC_SLUG_RE.match(slug):
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    async with AsyncSessionLocal() as session:
+        tenant = (await session.execute(
+            select(sql_models.Tenant).where(sql_models.Tenant.slug == slug)
+        )).scalar_one_or_none()
+    if not tenant or tenant.status != "active":
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    logo = (tenant.branding or {}).get("logo") or ""
+    if logo.startswith("http") or logo.startswith("data:"):
+        return RedirectResponse(url=logo)
+    if not logo or "/" in logo or "\\" in logo or logo.startswith("."):
+        raise HTTPException(status_code=404, detail="Tenant has no logo")
+    ext = logo.rsplit(".", 1)[-1].lower() if "." in logo else ""
+    media_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                   "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml",
+                   "ico": "image/x-icon", "bmp": "image/bmp"}
+    if ext not in media_types:
+        raise HTTPException(status_code=404, detail="Tenant has no logo")
+    from pathlib import Path
+    uploads = Path(__file__).resolve().parent.parent / "uploads"
+    for candidate in (uploads / tenant.id / logo,
+                      uploads / PLATFORM_TENANT_ID / logo,
+                      uploads / logo):
+        if candidate.exists() and candidate.is_file():
+            return FileResponse(candidate, media_type=media_types[ext])
+    raise HTTPException(status_code=404, detail="Tenant has no logo")
+
+
 @router.get("/tenants")
 async def list_tenants(current_user: dict = Depends(get_current_user)):
     _require_master_admin(current_user)

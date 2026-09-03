@@ -55,6 +55,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Ambiguous login (number in more than one company) is not a logout —
+      // let the login page handle it inline instead of reloading.
+      const detail = error.response?.data?.detail || '';
+      if (/more than one workspace/i.test(detail)) {
+        return Promise.reject(error);
+      }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem(DOWNLOAD_TOKEN_KEY);
@@ -303,6 +309,7 @@ export const tenantApi = {
   update: (id, data) => api.put(`/tenants/${id}`, data),
   remove: (id) => api.delete(`/tenants/${id}`),
   getPublic: (slug) => api.get(`/tenants/public/${encodeURIComponent(slug)}`),
+  getPublicLogoUrl: (slug) => `${API_BASE}/tenants/public/${encodeURIComponent(slug)}/logo`,
 };
 
 // Product Access

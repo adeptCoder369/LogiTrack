@@ -48,11 +48,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState('main'); // main, loginOtp, forgotPassword, firstTimeSetup
   const [loginMode, setLoginMode] = useState('workspace'); // 'workspace' | 'platform'
+  const [needCode, setNeedCode] = useState(false); // highlight company-code field after ambiguous-number 401
   const isPlatform = loginMode === 'platform';
   // Platform owner never sends a tenant; workspace users send their company code
   const effTenant = (t) => (isPlatform ? undefined : (t && t.trim() ? t.trim().toLowerCase() : undefined));
   const switchMode = (mode) => {
     setLoginMode(mode);
+    setNeedCode(false);
     setLoginData(d => ({ ...d, tenant: '' }));
     setOtpLoginData(d => ({ ...d, tenant: '' }));
     setForgotData(d => ({ ...d, tenant: '' }));
@@ -194,6 +196,7 @@ export default function Login() {
       toast.error('Mobile number must be 10 digits');
       return;
     }
+    setNeedCode(false);
     setLoading(true);
     try {
       const response = await authApi.login({
@@ -227,6 +230,9 @@ export default function Login() {
         window.location.reload(); // Force refresh to update auth state
       }
     } catch (error) {
+      if (!isPlatform && /more than one workspace/i.test(error.response?.data?.detail || '')) {
+        setNeedCode(true);
+      }
       toast.error(friendlyLoginError(error, 'Login failed'));
     } finally {
       setLoading(false);
@@ -304,6 +310,9 @@ export default function Login() {
       toast.success('Login successful!');
       navigate('/');
     } catch (error) {
+      if (!isPlatform && /more than one workspace/i.test(error.response?.data?.detail || '')) {
+        setNeedCode(true);
+      }
       toast.error(friendlyLoginError(error, 'Invalid OTP'));
     } finally {
       setLoading(false);
@@ -489,18 +498,20 @@ export default function Login() {
     return (
       <div className="space-y-2">
         <Label htmlFor={`${prefix}tenant`}>
-          Company code <span className="text-red-500">*</span>
+          Company code
         </Label>
         <Input
           id={`${prefix}tenant`}
           value={data.tenant}
-          onChange={(e) => setData({ ...data, tenant: e.target.value.trim().toLowerCase() })}
+          onChange={(e) => { setNeedCode(false); setData({ ...data, tenant: e.target.value.trim().toLowerCase() }); }}
           placeholder="e.g. acme"
-          className="pl-10"
+          className={`pl-10 ${needCode ? 'border-red-500 ring-1 ring-red-500' : ''}`}
           data-testid={`${prefix}tenant`}
         />
-        <p className="text-xs text-slate-500">
-          The short code for your company — your admin gives this to you.
+        <p className={`text-xs ${needCode ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+          {needCode
+            ? 'This number is used in more than one company — enter your company code above.'
+            : 'Needed only if your number works in more than one company — your admin gives this to you.'}
         </p>
       </div>
     );
@@ -871,20 +882,38 @@ export default function Login() {
         </div>
         <div className="w-full max-w-md">
           {/* found-tenant brand chip */}
-          {!isPlatform && foundTenant && (
-            <div className="mb-4 flex items-center justify-center gap-2.5 bg-white border rounded-xl px-4 py-2.5 shadow-sm">
-              {foundTenant.branding?.logo && (foundTenant.branding.logo.startsWith('http') || foundTenant.branding.logo.startsWith('data:')) ? (
-                <img src={foundTenant.branding.logo} alt={foundTenant.name} className="h-7 max-w-[90px] object-contain" />
-              ) : (
-                <div className="w-7 h-7 brand-gradient rounded-lg flex items-center justify-center text-white text-xs font-bold">
+          {!isPlatform && foundTenant && (() => {
+            const logo = foundTenant.branding?.logo || '';
+            const logoSrc = logo
+              ? (logo.startsWith('http') || logo.startsWith('data:')
+                  ? logo
+                  : tenantApi.getPublicLogoUrl(foundTenant.slug))
+              : null;
+            return (
+              <div className="mb-4 flex items-center justify-center gap-2.5 bg-white border rounded-xl px-4 py-2.5 shadow-sm">
+                {logoSrc ? (
+                  <img
+                    src={logoSrc}
+                    alt={foundTenant.name}
+                    className="h-7 max-w-[90px] object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="w-7 h-7 brand-gradient rounded-lg items-center justify-center text-white text-xs font-bold"
+                  style={{ display: logoSrc ? 'none' : 'flex' }}
+                >
                   {(foundTenant.branding?.name || foundTenant.name || '?').charAt(0).toUpperCase()}
                 </div>
-              )}
-              <span className="text-sm font-semibold text-slate-900">
-                You're signing in to {foundTenant.branding?.name || foundTenant.name}
-              </span>
-            </div>
-          )}
+                <span className="text-sm font-semibold text-slate-900">
+                  You're signing in to {foundTenant.branding?.name || foundTenant.name}
+                </span>
+              </div>
+            );
+          })()}
           {/* subtle mode hint */}
           <div className="mb-4 flex items-center justify-center gap-2 text-[11px] text-slate-500">
             <span className="px-2 py-1 rounded-full bg-white border text-slate-600">
