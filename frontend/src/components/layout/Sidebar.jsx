@@ -15,6 +15,7 @@ import {
   BarChart3,
   Menu,
   X,
+  Search,
   LogOut,
   PackageCheck,
   CheckCircle,
@@ -83,6 +84,7 @@ const allNavItems = [
 export const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const { user, logout, tenant } = useAuth();
   const { hasRoutePermission, loading, myDepots, myProducts } = usePermissions();
   const navigate = useNavigate();
@@ -130,6 +132,10 @@ export const Sidebar = () => {
               ? [{ to: '/tenants', icon: ShieldCheck, label: 'Tenants' }]
               : []),
           ];
+
+  const visibleNavItems = navItems.filter((item) =>
+    item.label.toLowerCase().includes(searchTerm.trim().toLowerCase())
+  );
 
   return (
     <>
@@ -279,6 +285,29 @@ export const Sidebar = () => {
           </div>
         )}
 
+        {/* Search */}
+        <div className="px-3 pt-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search menu..."
+              data-testid="sidebar-search"
+              className="w-full bg-slate-900/50 border border-slate-800/60 rounded-lg pl-8 pr-7 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-slate-600"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200"
+                title="Clear"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* MIDDLE SECTION: Scrollable Custom Navigation Links */}
         <nav className="flex-1 overflow-y-auto px-3 py-2 scrollbar-thin scrollbar-thumb-slate-800">
           {loading ? (
@@ -286,9 +315,11 @@ export const Sidebar = () => {
               <div className="w-5 h-5 border-2 border-white/20 border-t-accent-brand rounded-full animate-spin" />
               <div className="text-slate-500 text-xs tracking-wide">Loading configuration...</div>
             </div>
+          ) : visibleNavItems.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs">No menu matches "{searchTerm.trim()}"</div>
           ) : (
             <ul className="space-y-1">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
