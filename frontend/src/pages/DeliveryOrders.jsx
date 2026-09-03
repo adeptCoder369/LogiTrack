@@ -600,7 +600,7 @@ export default function DeliveryOrders() {
             Export Excel
           </Button>
           <Can action="create_delivery_order">
-            <Button onClick={handleAdd} className="bg-orange-500 hover:bg-orange-600">
+            <Button onClick={handleAdd} className="bg-accent-brand hover:bg-accent-brand/90">
               <Plus className="w-4 h-4 mr-2" />
               Create Purchase DO
             </Button>

@@ -132,7 +132,7 @@ export default function Billing() {
                 <option value="canceled">canceled</option>
                 <option value="trialing">trialing</option>
               </select>
-              <button type="submit" disabled={saving} className="py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md">{saving ? 'Saving...' : 'Save'}</button>
+              <button type="submit" disabled={saving} className="py-2 text-xs font-semibold text-white bg-brand hover:bg-brand/90 rounded-md">{saving ? 'Saving...' : 'Save'}</button>
             </form>
             <div className="flex gap-2 mt-3">
               <button onClick={() => form.tenant_id && handleCheckout(form.tenant_id)} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-slate-900 text-white rounded hover:bg-slate-800">

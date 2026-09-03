@@ -444,7 +444,7 @@ console.log(transporters)
             {importing ? 'Importing...' : 'Import Excel'}
           </Button>
           <Can action="create_transporter">
-            <Button onClick={handleAdd} className="bg-slate-900 hover:bg-slate-800" data-testid="add-transporter-btn">
+            <Button onClick={handleAdd} className="bg-brand hover:bg-brand/90" data-testid="add-transporter-btn">
               <Plus className="w-4 h-4 mr-2" />
               Add Transporter
             </Button>
@@ -723,7 +723,7 @@ console.log(transporters)
               </div>
               <div className="flex items-center gap-2">
                 {canCreateTransporterUsers && (
-                  <Button onClick={handleAddUser} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  <Button onClick={handleAddUser} size="sm" className="bg-brand hover:bg-brand/90">
                     <Plus className="w-4 h-4 mr-1" />
                     Add User
                   </Button>

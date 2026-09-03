@@ -233,7 +233,7 @@ export default function Firms() {
         </div>
         <button
           onClick={() => { setEditing(null); setFormData(emptyForm); setShowSidebar(true); }}
-          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all duration-200 self-start md:self-auto"
+          className="flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all duration-200 self-start md:self-auto"
         >
           <Plus className="w-4 h-4" /> Add Firm
         </button>
@@ -462,7 +462,7 @@ export default function Firms() {
               </div>
               <div className="border-t pt-4 mt-6 flex gap-3">
                 <button type="button" onClick={() => setShowSidebar(false)} className="flex-1 py-2 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md transition">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition">
+                <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand/90 rounded-md shadow-sm transition">
                   {saving ? 'Saving...' : (editing ? 'Save Firm' : 'Create Firm')}
                 </button>
               </div>
@@ -540,7 +540,7 @@ export default function Firms() {
                           <option value="Head Office">Head Office</option>
                           <option value="Branch">Branch</option>
                         </select>
-                        <button onClick={addOffice} className="px-3 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded"><Plus className="w-3.5 h-3.5" /></button>
+                        <button onClick={addOffice} className="px-3 py-2 text-xs font-bold bg-brand hover:bg-brand/90 text-white rounded"><Plus className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
                   )}
@@ -577,7 +577,7 @@ export default function Firms() {
                             <option key={p.id} value={p.id}>{p.product_name}</option>
                           ))}
                         </select>
-                        <button onClick={addFactory} className="px-3 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded"><Plus className="w-3.5 h-3.5" /></button>
+                        <button onClick={addFactory} className="px-3 py-2 text-xs font-bold bg-brand hover:bg-brand/90 text-white rounded"><Plus className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
                   )}

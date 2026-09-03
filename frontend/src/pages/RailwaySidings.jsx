@@ -182,7 +182,7 @@ export default function RailwaySidings() {
       subtitle="Manage railway siding points for rake transportation"
       actions={
         <Can action="create_railway_siding">
-          <Button onClick={handleAdd} className="bg-slate-900 hover:bg-slate-800" data-testid="add-siding-btn">
+          <Button onClick={handleAdd} className="bg-brand hover:bg-brand/90" data-testid="add-siding-btn">
             <Plus className="w-4 h-4 mr-2" />
             Add Siding
           </Button>

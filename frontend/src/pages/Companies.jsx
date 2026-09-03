@@ -760,7 +760,7 @@ export default function Companies() {
             onChange={handleImport}
           />
           <Can action="create_company">
-            <Button onClick={handleAdd} className="bg-slate-900 hover:bg-slate-800">
+            <Button onClick={handleAdd} className="bg-brand hover:bg-brand/90">
               <Plus className="w-4 h-4 mr-2" />
               Add Company
             </Button>
@@ -1564,7 +1564,7 @@ export default function Companies() {
                       placeholder="Contact mobile"
                       className="text-xs"
                     />
-                    <Button size="sm" onClick={addOffice} disabled={orgSaving} className="shrink-0 bg-slate-900 hover:bg-slate-800">
+                    <Button size="sm" onClick={addOffice} disabled={orgSaving} className="shrink-0 bg-brand hover:bg-brand/90">
                       <Plus className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -1624,7 +1624,7 @@ export default function Companies() {
                     placeholder="City"
                     className="text-xs"
                   />
-                  <Button size="sm" onClick={addFactory} disabled={orgSaving} className="bg-slate-900 hover:bg-slate-800">
+                  <Button size="sm" onClick={addFactory} disabled={orgSaving} className="bg-brand hover:bg-brand/90">
                     <Plus className="w-3.5 h-3.5 mr-1" /> Add Factory
                   </Button>
                 </div>

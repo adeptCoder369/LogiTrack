@@ -90,7 +90,7 @@ export default function Payments() {
         </div>
         <button
           onClick={() => { setFormData(emptyForm); setModalOpen(true); }}
-          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all"
+          className="flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all"
         >
           <Plus className="w-4 h-4" /> Record Payment
         </button>
@@ -229,7 +229,7 @@ export default function Payments() {
               </div>
               <div className="border-t pt-4 flex gap-3 mt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="flex-1 py-2 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md transition">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition">
+                <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand/90 rounded-md shadow-sm transition">
                   {saving ? 'Saving...' : 'Record Payment'}
                 </button>
               </div>

@@ -1089,7 +1089,7 @@ companyId: urlCompanyId || '',
           <Can action="create_primary_lifting">
             <Button 
               onClick={() => { setLiftingType('Primary'); handleAdd('Primary'); }} 
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-brand hover:bg-brand/90"
               data-testid="add-primary-lifting-btn"
             >
               <Plus className="w-4 h-4 mr-2" />

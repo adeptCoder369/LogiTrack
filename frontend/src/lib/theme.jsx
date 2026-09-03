@@ -7,18 +7,31 @@ import { useAuth } from './auth';
 // stays in place.
 const APP_NAME = 'LogiTrack Pro';
 
+const DEFAULTS = {
+  '--primary': '222 47% 11%',
+  '--primary-foreground': '210 40% 98%',
+  '--ring': '222 47% 11%',
+  '--chart-1': '222 47% 11%',
+  '--accent': '24 95% 53%',
+  '--accent-foreground': '0 0% 100%',
+  '--chart-2': '24 95% 53%',
+  '--brand-secondary': '0 0% 100%',
+  '--brand-text': '222 84% 5%',
+};
+
 export function applyBranding(branding) {
   const b = branding || {};
   const root = document.documentElement;
+  // Reset first so super tenant (no branding) always gets defaults,
+  // even after a tenant session in the same browser.
+  Object.entries(DEFAULTS).forEach(([k, v]) => root.style.setProperty(k, v));
   if (b.primary) {
     root.style.setProperty('--primary', b.primary);
-    root.style.setProperty('--primary-foreground', '210 40% 98%');
     root.style.setProperty('--ring', b.primary);
     root.style.setProperty('--chart-1', b.primary);
   }
   if (b.accent) {
     root.style.setProperty('--accent', b.accent);
-    root.style.setProperty('--accent-foreground', '0 0% 100%');
     root.style.setProperty('--chart-2', b.accent);
   }
   if (b.secondary) {
@@ -27,9 +40,7 @@ export function applyBranding(branding) {
   if (b.text) {
     root.style.setProperty('--brand-text', b.text);
   }
-  if (b.name) {
-    document.title = `${b.name} | ${APP_NAME}`;
-  }
+  document.title = b.name ? `${b.name} | ${APP_NAME}` : APP_NAME;
 }
 
 export const ThemeProvider = ({ children }) => {

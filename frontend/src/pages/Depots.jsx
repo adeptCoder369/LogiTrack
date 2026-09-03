@@ -256,7 +256,7 @@ export default function Depots() {
       subtitle="Manage warehouses and depots"
       actions={
         <Can action="create_depot">
-          <Button onClick={handleAdd} className="bg-slate-900 hover:bg-slate-800" data-testid="add-depot-btn">
+          <Button onClick={handleAdd} className="bg-brand hover:bg-brand/90" data-testid="add-depot-btn">
             <Plus className="w-4 h-4 mr-2" />
             Add Depot
           </Button>

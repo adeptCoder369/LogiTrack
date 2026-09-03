@@ -66,7 +66,7 @@ export const LoaderDashboard = () => {
                   </div>
                 </div>
                 <Button
-                  className="w-full mt-4 bg-orange-500 hover:bg-orange-600"
+                  className="w-full mt-4 bg-accent-brand hover:bg-accent-brand/90"
                   onClick={() => navigate('/liftings')}
                 >
                   Create Lifting <ArrowRight className="w-4 h-4 ml-2" />

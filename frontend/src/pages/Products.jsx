@@ -245,7 +245,7 @@ function CatalogTab() {
             {importing ? 'Importing...' : 'Import Excel'}
           </Button>
           <Can action="create_product">
-            <Button onClick={handleAdd} className="bg-slate-900 hover:bg-slate-800" data-testid="add-product-btn">
+            <Button onClick={handleAdd} className="bg-brand hover:bg-brand/90" data-testid="add-product-btn">
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </Button>
@@ -656,7 +656,7 @@ function OverridesAndPricingTab() {
                       size="sm"
                       onClick={() => saveOverride(product)}
                       disabled={saving === `o-${product.id}`}
-                      className="w-full bg-slate-900 hover:bg-slate-800"
+                      className="w-full bg-brand hover:bg-brand/90"
                     >
                       <Save className="w-3.5 h-3.5 mr-1.5" />
                       {saving === `o-${product.id}` ? 'Saving...' : 'Save Override'}

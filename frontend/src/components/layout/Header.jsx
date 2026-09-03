@@ -7,13 +7,14 @@ export const Header = ({ title, subtitle }) => {
     <header className="glass-header sticky top-0 z-30 h-16 flex items-center justify-between px-4 lg:px-6 hidden lg:flex">
       <div>
         <h1
-          className="text-lg lg:text-xl font-bold text-slate-900"
+          className="text-lg lg:text-xl font-bold text-brand-text"
           style={{ fontFamily: 'Manrope' }}
         >
           {title}
         </h1>
+        <div className="mt-1 h-0.5 w-10 bg-accent-brand rounded-full" />
         {subtitle && (
-          <p className="text-sm text-slate-500">{subtitle}</p>
+          <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
         )}
       </div>
 
@@ -29,7 +30,7 @@ export const Header = ({ title, subtitle }) => {
 
         <Button variant="ghost" size="icon" className="relative" data-testid="notifications-btn">
           <Bell className="w-5 h-5 text-slate-600" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full" />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-accent-brand rounded-full" />
         </Button>
 
         <div className="flex items-center gap-2">

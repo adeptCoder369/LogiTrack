@@ -153,7 +153,7 @@ export default function UsersPage() {
       title="Users"
       subtitle="Manage system users"
       actions={
-        <Button onClick={handleAdd} className="bg-slate-900 hover:bg-slate-800" data-testid="add-user-btn">
+        <Button onClick={handleAdd} className="bg-brand hover:bg-brand/90" data-testid="add-user-btn">
           <Plus className="w-4 h-4 mr-2" />
           Add User
         </Button>

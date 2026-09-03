@@ -145,7 +145,7 @@ function TransfersTab() {
           <a href={stockTransfersApi.exportLedger()} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-3 py-2 text-xs font-semibold bg-white border rounded hover:bg-slate-50">
             <FileSpreadsheet className="w-3.5 h-3.5" /> Export
           </a>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-lg shadow">
+          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-brand hover:bg-brand/90 text-white font-medium text-xs px-4 py-2 rounded-lg shadow">
             <Plus className="w-4 h-4" /> Request Transfer
           </button>
         </div>
@@ -257,7 +257,7 @@ function TransfersTab() {
               </div>
               <div className="border-t pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-2 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm">{saving ? 'Requesting...' : 'Request'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand/90 rounded-md shadow-sm">{saving ? 'Requesting...' : 'Request'}</button>
               </div>
             </form>
           </div>
@@ -307,7 +307,7 @@ function TransfersTab() {
                   {canApprove && <button onClick={() => doAction('approve')} className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />Approve</button>}
                   {canReject && <button onClick={() => doAction('reject')} className="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Reject</button>}
                   {canDispatch && <button onClick={() => doAction('dispatch')} className="px-3 py-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded flex items-center gap-1"><Truck className="w-3.5 h-3.5" />Dispatch</button>}
-                  {canReceive && <button onClick={() => doAction('receive')} className="px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1"><Package className="w-3.5 h-3.5" />Receive</button>}
+                  {canReceive && <button onClick={() => doAction('receive')} className="px-3 py-1.5 text-xs font-bold bg-brand hover:bg-brand/90 text-white rounded flex items-center gap-1"><Package className="w-3.5 h-3.5" />Receive</button>}
                   {canCancel && <button onClick={() => doAction('cancel')} className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border">Cancel</button>}
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2">Locked qty is reserved at request; on receive the stock moves atomically.</p>
@@ -404,7 +404,7 @@ function ApprovalTab() {
           <input type="text" value={formData.approver_roles} onChange={(e) => setFormData({ ...formData, approver_roles: e.target.value })} className="w-full text-xs p-2.5 border rounded font-mono" placeholder="Management, Admin" />
         </div>
         <div className="flex items-end gap-2">
-          <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+          <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand/90 rounded-md">
             {saving ? 'Saving...' : editing ? 'Update' : 'Add Rule'}
           </button>
           {editing && <button type="button" onClick={() => { setEditing(null); setFormData(emptyMatrixForm); }} className="px-3 py-2 text-xs font-semibold bg-slate-100 rounded">Cancel</button>}

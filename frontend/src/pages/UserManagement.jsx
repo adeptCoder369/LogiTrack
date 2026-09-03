@@ -314,7 +314,7 @@ export default function UserManagement() {
             Export Excel
           </Button>
           <Can action="create_user">
-            <Button onClick={handleAdd} className="bg-orange-500 hover:bg-orange-600" data-testid="add-user-btn">
+            <Button onClick={handleAdd} className="bg-accent-brand hover:bg-accent-brand/90" data-testid="add-user-btn">
               <Plus className="w-4 h-4 mr-2" />
               Add User
             </Button>
@@ -731,7 +731,7 @@ export default function UserManagement() {
               <Button type="button" variant="outline" onClick={() => { setModalOpen(false); setEditingUser(null); }}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving} className="bg-orange-500 hover:bg-orange-600">
+              <Button type="submit" disabled={saving} className="bg-accent-brand hover:bg-accent-brand/90">
                 {saving ? (editingUser ? 'Saving...' : 'Creating...') : (editingUser ? 'Save Changes' : 'Create User')}
               </Button>
             </div>

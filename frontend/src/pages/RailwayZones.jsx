@@ -131,7 +131,7 @@ export default function RailwayZonePage() {
         <Can action="create_railway_zone">
           <button 
             onClick={() => { setEditingZone(null); setShowSidebar(true); }}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all duration-200 self-start md:self-auto"
+            className="flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 text-white font-medium text-xs px-4 py-2.5 rounded-lg shadow transition-all duration-200 self-start md:self-auto"
           >
             <Plus className="w-4 h-4" /> Add Railway Zone
           </button>
@@ -405,7 +405,7 @@ export default function RailwayZonePage() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition"
+                  className="flex-1 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand/90 rounded-md shadow-sm transition"
                 >
                   {editingZone ? "Save Parameters" : "Provision Zone"}
                 </button>

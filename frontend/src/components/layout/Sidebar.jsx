@@ -134,7 +134,7 @@ export const Sidebar = () => {
   return (
     <>
       {/* Mobile Menu Trigger Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 z-50 px-4 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 brand-sidebar backdrop-blur-md z-50 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {hasCustomLogo && !logoError ? (
             <img src={brandLogo} alt={brandName} className="h-8 max-w-[120px] object-contain bg-white rounded-lg p-1" onError={() => setLogoError(true)} />
@@ -169,7 +169,7 @@ export const Sidebar = () => {
         data-testid="sidebar"
         className={`
           fixed top-0 left-0 h-full w-64 z-40 flex flex-col
-          bg-slate-900 border-r border-slate-800 text-slate-300
+          brand-sidebar text-slate-300
           transform transition-transform duration-300 ease-in-out
           lg:translate-x-0
           ${mobileOpen ? 'translate-x-0 top-0' : '-translate-x-full lg:translate-x-0'}
@@ -189,7 +189,7 @@ export const Sidebar = () => {
               />
             </div>
           ) : (
-            <div className="w-11 h-11 brand-gradient rounded-xl flex items-center justify-center shadow-lg shadow-black/20 flex-shrink-0">
+            <div className="w-11 h-11 bg-brand rounded-xl flex items-center justify-center shadow-lg shadow-black/20 flex-shrink-0">
               <Truck className="w-5 h-5 text-white" />
             </div>
           )}
@@ -283,7 +283,7 @@ export const Sidebar = () => {
         <nav className="flex-1 overflow-y-auto px-3 py-2 scrollbar-thin scrollbar-thumb-slate-800">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <div className="w-5 h-5 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-white/20 border-t-accent-brand rounded-full animate-spin" />
               <div className="text-slate-500 text-xs tracking-wide">Loading configuration...</div>
             </div>
           ) : (
@@ -296,8 +296,8 @@ export const Sidebar = () => {
                     className={({ isActive }) => `
                       flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative
                       ${isActive
-                        ? 'bg-slate-800 text-white shadow-sm ring-1 ring-slate-700/50'
-                        : 'text-slate-400 hover:bg-slate-850 hover:text-slate-200'
+                        ? 'brand-sidebar-active shadow-sm'
+                        : 'text-slate-400 brand-sidebar-hover hover:text-slate-200'
                       }
                     `}
                     onClick={() => setMobileOpen(false)}
@@ -311,7 +311,7 @@ export const Sidebar = () => {
                         )}
                         <item.icon
                           size={18}
-                          className={`transition-colors flex-shrink-0 ${isActive ? 'text-orange-400' : 'text-slate-400 group-hover:text-slate-300'
+                          className={`transition-colors flex-shrink-0 ${isActive ? 'text-accent-brand' : 'text-slate-400 group-hover:text-slate-300'
                             }`}
                         />
                         <span className="truncate">{item.label}</span>
