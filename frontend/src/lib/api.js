@@ -301,6 +301,7 @@ export const tenantApi = {
   getAll: () => api.get('/tenants'),
   create: (data) => api.post('/tenants', data),
   update: (id, data) => api.put(`/tenants/${id}`, data),
+  remove: (id) => api.delete(`/tenants/${id}`),
 };
 
 // Product Access

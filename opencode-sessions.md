@@ -83,12 +83,40 @@ Starting Phase 6 (SaaS operations).
 
 ------------ PHASE_6 — SaaS operations + PaaS readiness ------------
 
-1. Usage tracking — logs, middleware, summary + dashboard
+Usage tracking — logs, middleware, summary + dashboard
+Billing hooks — subscriptions, Stripe/PayPal stubs, webhooks
+Extension registry — hook points, sample extension
+API versioning — /api/v2 POC, deprecation headers
+White-label — tenant resolver (header + subdomain)
 
-2. Billing hooks — subscriptions, Stripe/PayPal stubs, webhooks
 
-3. Extension registry — hook points, sample extension, docs
 
-4. API versioning — /api/v2 POC, deprecation headers
 
-5. White-label — tenant resolver (header + subdomain)
+quick update
+------------ PHASE_6 — SaaS operations + PaaS readiness ------------
+Usage tracking — logs, middleware, summary + dashboard
+Billing hooks — subscriptions, Stripe/PayPal stubs, webhooks
+Extension registry — hook points, sample extension
+API versioning — /api/v2 POC, deprecation headers
+White-label — tenant resolver (header + subdomain)
+
+
+https://logitrack-frontend-lac.vercel.app
+
+
+
+now i am testing and fixing any bug along — we can also start testing and giving feedback on flow
+i have already seeded demo data so you can check every flow:
+acme tenant — use slug acme at login
+acme Management 919000000001 / Demo@123
+acme Admin 919000000002 / Demo@123
+acme Loader 919000000003 / Demo@123
+acme Weightment 919000000004 / Demo@123
+acme Depot Staff 919000000005 / Demo@123
+acme Depot Supervisor 919000000006 / Demo@123
+acme Transporter 919000000007 / Demo@123
+acme Dispatch Verifier 919000000008 / Demo@123
+
+how to login — mobile + country 91 + password Demo@123 + tenant slug acme (important, same mobile works for demo and acme but slug tells which workspace)
+master/platform — 999999999999 / Master@123 (no tenant needed, to see tenants, billing, usage)
+please use the acme tenant to test and give feedback on flow — thanks

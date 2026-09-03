@@ -14,9 +14,11 @@ import {
   User,
   ChevronDown,
   Check,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
+import { DeleteDialog } from "../components/shared/DeleteDialog";
 import { toast } from 'sonner';
 import { tenantApi, getFileUrl } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -96,7 +98,11 @@ export default function TenantsPage() {
     ownerEmail: ""
   });
   const [flagDropdownOpen, setFlagDropdownOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingTenant, setDeletingTenant] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const KNOWN_FLAGS = ["invoices", "stock_transfers", "leads", "firms", "payments", "reports", "analytics"];
+  const PLATFORM_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -181,6 +187,28 @@ export default function TenantsPage() {
     } catch (error) {
       console.error('Failed to save tenant', error);
       toast.error(error.response?.data?.detail || 'Unable to save Tenant');
+    }
+  };
+
+  const handleDelete = (tenant) => {
+    setDeletingTenant(tenant);
+    setDeleteOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTenant) return;
+    setDeleting(true);
+    try {
+      const response = await tenantApi.remove(deletingTenant.id);
+      setTenants(prev => prev.filter(item => item.id !== deletingTenant.id));
+      toast.success(response.data?.message || `Tenant '${deletingTenant.slug}' deleted`);
+      setDeleteOpen(false);
+      setDeletingTenant(null);
+    } catch (error) {
+      console.error('Failed to delete tenant', error);
+      toast.error(error.response?.data?.detail || 'Unable to delete Tenant');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -395,13 +423,24 @@ export default function TenantsPage() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <button
-                        onClick={() => handleEdit(tenant)}
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                        title="Edit Tenant"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleEdit(tenant)}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                          title="Edit Tenant"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        {tenant.id !== PLATFORM_TENANT_ID && (
+                          <button
+                            onClick={() => handleDelete(tenant)}
+                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded transition"
+                            title="Delete Tenant (removes all tenant data)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -686,6 +725,15 @@ export default function TenantsPage() {
           </div>
         </div>
       )}
+
+      <DeleteDialog
+        open={deleteOpen}
+        onClose={() => { setDeleteOpen(false); setDeletingTenant(null); }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Tenant"
+        description={`Are you sure you want to completely delete "${deletingTenant?.name}" (${deletingTenant?.slug})? This removes the tenant, its owner login, companies, depots, products, orders, invoices, transfers and all other tenant data. This action cannot be undone.`}
+        loading={deleting}
+      />
 
     </div>
   );

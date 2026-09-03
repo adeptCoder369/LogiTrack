@@ -7,10 +7,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from database import AsyncSessionLocal
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 import models_sqlalchemy as sql_models
 from auth_utils import get_current_user
-from tenant import get_tenant_config
+from tenant import get_tenant_config, PLATFORM_TENANT_ID
 
 router = APIRouter(tags=["Tenants"])
 
@@ -242,3 +242,41 @@ async def update_tenant(tenant_id: str, data: TenantUpdate, current_user: dict =
             if not owner:
                 owner = (await session.execute(select(sql_models.User).where(sql_models.User.tenant_id == tenant.id).order_by(sql_models.User.created_at).limit(1))).scalar_one_or_none()
     return _to_dict(tenant, owner)
+
+
+@router.delete("/tenants/{tenant_id}")
+async def delete_tenant(tenant_id: str, current_user: dict = Depends(get_current_user)):
+    """Completely delete a tenant and ALL its data (users, companies, orders, invoices, transfers, ...)."""
+    _require_master_admin(current_user)
+    if tenant_id == PLATFORM_TENANT_ID:
+        raise HTTPException(status_code=400, detail="Platform tenant cannot be deleted")
+    async with AsyncSessionLocal() as session:
+        tenant = (await session.execute(
+            select(sql_models.Tenant).where(sql_models.Tenant.id == tenant_id)
+        )).scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        slug = tenant.slug
+        # wipe every tenant-scoped table (Tenant row deleted last)
+        deleted_counts = {}
+        models = [
+            m.class_ for m in sql_models.Base.registry.mappers
+            if "tenant_id" in m.class_.__table__.columns
+            and m.class_.__name__ != "Tenant"
+        ]
+        for model in models:
+            res = await session.execute(delete(model).where(model.tenant_id == tenant_id))
+            if res.rowcount:
+                deleted_counts[model.__tablename__] = res.rowcount
+        await session.execute(delete(sql_models.Tenant).where(sql_models.Tenant.id == tenant_id))
+        await session.commit()
+    # remove tenant's upload folder (logo/files uploaded as this tenant stay under platform)
+    try:
+        from pathlib import Path
+        import shutil
+        upload_dir = Path(__file__).resolve().parent.parent / "uploads" / tenant_id
+        if upload_dir.exists():
+            shutil.rmtree(upload_dir)
+    except Exception:
+        pass
+    return {"message": f"Tenant '{slug}' and all its data deleted", "deleted": deleted_counts}
