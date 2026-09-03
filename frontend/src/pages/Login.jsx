@@ -75,7 +75,7 @@ export default function Login() {
         type="button"
         onClick={() => switchMode('workspace')}
         data-testid="login-tab-workspace"
-        className={`flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${!isPlatform ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+        className={`flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${!isPlatform ? 'bg-white shadow text-brand-text' : 'text-slate-500 hover:text-slate-700'}`}
       >
         <Building2 className="w-4 h-4" />
         Company login
@@ -84,7 +84,7 @@ export default function Login() {
         type="button"
         onClick={() => switchMode('platform')}
         data-testid="login-tab-platform"
-        className={`flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${isPlatform ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+        className={`flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${isPlatform ? 'bg-white shadow text-brand-text' : 'text-slate-500 hover:text-slate-700'}`}
       >
         <ShieldCheck className="w-4 h-4" />
         Platform owner
@@ -554,7 +554,8 @@ export default function Login() {
 
   // Main Login View
   const renderMainLogin = () => (
-    <Card className="border-0 shadow-2xl">
+    <Card className="border-0 shadow-2xl overflow-hidden">
+      <div className="h-1.5 bg-accent-brand" />
       <CardHeader className="text-center pb-2">
         {renderModeTabs()}
         <CardTitle className="text-brand-text" style={{ fontFamily: 'Manrope' }}>{isPlatform ? 'Platform Sign In' : 'Welcome Back'}</CardTitle>
@@ -622,7 +623,8 @@ export default function Login() {
 
   // Login with OTP View
   const renderLoginOtp = () => (
-    <Card className="border-0 shadow-2xl">
+    <Card className="border-0 shadow-2xl overflow-hidden">
+      <div className="h-1.5 bg-accent-brand" />
       <CardHeader className="text-center pb-2">
         {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', tenant: '', step: 'mobile' }))}
         {renderModeTabs()}
@@ -666,7 +668,8 @@ export default function Login() {
 
   // Forgot Password View
   const renderForgotPassword = () => (
-    <Card className="border-0 shadow-2xl">
+    <Card className="border-0 shadow-2xl overflow-hidden">
+      <div className="h-1.5 bg-accent-brand" />
       <CardHeader className="text-center pb-2">
         {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' }))}
         {renderModeTabs()}
@@ -755,7 +758,8 @@ export default function Login() {
 
   // First-time Setup View
   const renderFirstTimeSetup = () => (
-    <Card className="border-0 shadow-2xl">
+    <Card className="border-0 shadow-2xl overflow-hidden">
+      <div className="h-1.5 bg-accent-brand" />
       <CardHeader className="text-center pb-2">
         <CardTitle className="text-brand-text" style={{ fontFamily: 'Manrope' }}>Welcome!</CardTitle>
         <CardDescription>
@@ -823,23 +827,25 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Left — Brand / Story (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-[52%] brand-gradient relative flex-col justify-between p-10 xl:p-14 text-white overflow-hidden">
-        {/* subtle pattern */}
+      {/* Left — Brand / Story (hidden on mobile). Solid primary, accent rule, secondary tiles. */}
+      <div className="hidden lg:flex lg:w-[52%] bg-brand relative flex-col justify-between p-10 xl:p-14 text-white overflow-hidden">
+        {/* subtle texture */}
         <div className="absolute inset-0 bg-black/10" />
-        <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/[0.07] rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-white/[0.05] rounded-full blur-3xl" />
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-accent-brand" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <Truck className="w-5 h-5 text-slate-900" />
+            <div className="w-10 h-10 bg-brand-secondary rounded-xl flex items-center justify-center shadow-lg">
+              <Truck className="w-5 h-5 text-brand-text" />
             </div>
             <span className="text-lg font-bold tracking-widest uppercase" style={{ fontFamily: 'Manrope' }}>IBRMCO Pro</span>
-            <span className="ml-2 px-2 py-0.5 rounded bg-white/20 text-[10px] font-bold tracking-wider">v2.1</span>
+            <span className="ml-2 px-2 py-0.5 rounded bg-accent-brand text-white text-[10px] font-bold tracking-wider">v2.1</span>
           </div>
           <h1 className="text-4xl xl:text-[42px] font-extrabold leading-tight" style={{ fontFamily: 'Manrope' }}>
             Logistics,<br />Unified.
           </h1>
+          <div className="mt-5 h-1 w-16 bg-accent-brand rounded-full" />
           <p className="mt-4 text-white/80 text-sm xl:text-[15px] leading-relaxed max-w-md">
             Multi-tenant SaaS for depots, inventory, dispatches and billing — one workspace per client, one login per role.
           </p>
@@ -872,7 +878,7 @@ export default function Login() {
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10 bg-slate-50">
         {/* Mobile brand header */}
         <div className="lg:hidden flex items-center gap-2.5 mb-6 w-full max-w-md">
-          <div className="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center shadow">
+          <div className="w-9 h-9 bg-brand rounded-xl flex items-center justify-center shadow">
             <Truck className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -890,7 +896,7 @@ export default function Login() {
                   : tenantApi.getPublicLogoUrl(foundTenant.slug))
               : null;
             return (
-              <div className="mb-4 flex items-center justify-center gap-2.5 bg-white border rounded-xl px-4 py-2.5 shadow-sm">
+              <div className="mb-4 flex items-center justify-center gap-2.5 bg-white border border-l-4 rounded-xl px-4 py-2.5 shadow-sm" style={{ borderLeftColor: 'hsl(var(--accent))' }}>
                 {logoSrc ? (
                   <img
                     src={logoSrc}
@@ -903,7 +909,7 @@ export default function Login() {
                   />
                 ) : null}
                 <div
-                  className="w-7 h-7 brand-gradient rounded-lg items-center justify-center text-white text-xs font-bold"
+                  className="w-7 h-7 bg-brand rounded-lg items-center justify-center text-white text-xs font-bold"
                   style={{ display: logoSrc ? 'none' : 'flex' }}
                 >
                   {(foundTenant.branding?.name || foundTenant.name || '?').charAt(0).toUpperCase()}
